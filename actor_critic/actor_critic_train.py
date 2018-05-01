@@ -30,6 +30,13 @@ torch.manual_seed(args.seed)
 
 SavedAction = namedtuple('SavedAction', ['log_prob', 'value'])
 
+actions = [[1,0,0,0,0,0,0,0,0,0,0,0], # b
+        [0,0,0,0,0,0,0,1,0,0,0,0], # right
+        [0,0,0,0,0,0,1,0,0,0,0,0], # left
+        [0,0,0,0,0,1,0,0,0,0,0,0], # down
+        [0,0,0,0,0,1,1,0,0,0,0,0], # left down
+        [0,0,0,0,0,1,0,1,0,0,0,0], # right down
+        [1,0,0,0,0,1,0,0,0,0,0,0]] # down b
 
 class Policy(nn.Module):
     def __init__(self, num_inputs, action_space):
@@ -57,7 +64,7 @@ class Policy(nn.Module):
         return F.softmax(action_scores, dim=-1), state_values
 
 
-model = Policy(env.observation_space.shape[0], 2**env.action_space.n)
+model = Policy(env.observation_space.shape[0], 7)
 optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
 
@@ -67,7 +74,7 @@ def select_action(state):
     m = Categorical(probs)
     action = m.sample()
     model.saved_actions.append(SavedAction(m.log_prob(action), state_value))
-    return action.data
+    return action.data[0]
 
 
 def finish_episode():
@@ -92,7 +99,7 @@ def finish_episode():
     del model.rewards[:]
     del model.saved_actions[:]
 
-model.load_state_dict(torch.load('weights/{}.pt'.format("actor_critic_sonic1")))
+# model.load_state_dict(torch.load('weights/{}.pt'.format("actor_critic_sonic1")))
 
 running_length = 10
 max_reward = -100
@@ -102,17 +109,12 @@ for i_episode in count(1):
     done = False
     t = 0
     while not done:
-        action = int(select_action(np.array(state)))
-        action = [int(x) for x in bin(action)[2:]]
-        while len(action) < 12:
-            action.insert(0,0)
+        action = actions[int(select_action(np.array(state)))]
         state, reward, done, _ = env.step(action)
         # env.render()
         model.rewards.append(reward)
         current_reward+=reward
         t+=1
-        # if done:
-        #     break
 
     running_length = running_length * 0.99 + t * 0.01
     finish_episode()
