@@ -10,6 +10,8 @@ import gym_remote.client as grc
 import retro
 import retro_contest
 import random
+import cv2
+from collections import defaultdict
 
 
 def make(game, state, discrete_actions=False, bk2dir=None):
@@ -35,7 +37,10 @@ def make_remote_env(stack=True, scale_rew=True, socket_dir='/tmp'):
     env = AllowBacktracking(env)
     if scale_rew:
         env = RewardScaler(env)
+
     env = WarpFrame(env)
+    env = PseudoCountReward(env, game_specific=False)
+
     if stack:
         env = FrameStack(env, 4)
     env = EpisodeInfo(env)
@@ -76,7 +81,10 @@ def make_rand_env(game_states, stack=True, scale_rew=True):
     env = AllowBacktracking(env)
     if scale_rew:
         env = RewardScaler(env)
+
     env = WarpFrame(env)
+    env = PseudoCountReward(env, game_specific=True)
+
     if stack:
         env = FrameStack(env, 4)
     env = EpisodeInfo(env)
@@ -163,7 +171,7 @@ class EpisodeInfo(gym.Wrapper):
         if done:
             if "episode" not in info:
                 info = {"episode": {"l": self._ep_len, "r": self._ep_rew_total}}
-            elif isinstance(info, dict):
+            elif isinstance(info["episode"], dict):
                 if "l" not in info["episode"]:
                     info["episode"]["l"] = self._ep_len
                 if "r" not in info["episode"]:
@@ -185,4 +193,80 @@ class RandomEnvironmen(gym.Wrapper):
         self.env.close()
         game, state = random.choice(self.game_states)
         self.env = make(game, state)
+        return self.env.reset(**kwargs)
+
+
+class PseudoCountReward(gym.Wrapper):
+    """
+    This should go before any modification of state and after any modification of rewards
+    """
+    def __init__(self, env, exp_const=0.001, game_specific=False):
+        super(PseudoCountReward, self).__init__(env)
+        self.exp_const = exp_const
+
+        env = env.unwrapped
+
+        if game_specific and hasattr(env, "gamename") and hasattr(env, "statename"):
+            self.pseudo_counts = defaultdict(lambda: np.zeros((42 * 42, 256), dtype='int'))
+            self.game_specific = True
+        else:
+            self.pseudo_counts = np.zeros((42 * 42, 256), dtype='int')
+            self.game_specific = False
+
+        self._exp_reward = 0
+        self._ep_rew_total = 0
+
+    def step(self, action): # pylint: disable=E0202
+        obs, rew, done, info = self.env.step(action)
+
+        r_plus = 0
+        if self.exp_const > 0:
+            # frame = cv2.resize(obs, (84, 84))
+            # frame = cv2.cvtColor(obs, cv2.COLOR_RGB2GRAY)
+            s_r = cv2.resize(obs, (42, 42)).ravel()
+
+            if self.game_specific:
+                env_name = '{}_{}'.format(self.env.unwrapped.gamename, self.env.unwrapped.statename)
+                pseudo_counts = self.pseudo_counts[env_name]
+            else:
+                pseudo_counts = self.pseudo_counts
+
+            # add observation
+            pseudo_counts[np.arange(42 * 42), s_r] += 1
+
+            # calculate current density
+            n = pseudo_counts[np.arange(42 * 42), s_r]
+            N = pseudo_counts.sum(axis=1)
+            p = np.prod(n.astype('float') / N)
+
+            n_after = n + 1
+            N_after = N + 1
+            p_after = np.prod(n_after.astype('float') / N_after)
+
+            if p_after == p:
+                pseudo_cnt = 0
+            else:
+                pseudo_cnt = p * (1 - p_after) / (p_after - p)
+            r_plus = self.exp_const / np.sqrt(pseudo_cnt + 0.01)
+
+        info['rew_exp'] = r_plus
+        self._exp_reward += r_plus
+        self._ep_rew_total += rew
+        rew += r_plus
+
+        if done:
+            if "episode" not in info:
+                info["episode"] = {"r": self._ep_rew_total, "r_exp": self._exp_reward}
+            elif isinstance(info["episode"], dict):
+                info["episode"]["r_exp"] = self._exp_reward
+                if "r" not in info["episode"]:
+                    info["episode"]["r"] = self._ep_rew_total
+            self._ep_rew_total = 0
+            self._exp_reward = 0
+
+        return obs, rew, done, info
+
+    def reset(self, **kwargs):
+        self._ep_rew_total = 0
+        self._exp_reward = 0
         return self.env.reset(**kwargs)
