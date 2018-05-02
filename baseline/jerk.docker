@@ -1,0 +1,5 @@
+FROM openai/retro-agent:bare
+
+ADD jerk_agent.py ./agent.py
+
+CMD ["python", "-u", "/root/compo/agent.py"]
