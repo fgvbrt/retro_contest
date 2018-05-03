@@ -200,7 +200,7 @@ class PseudoCountReward(gym.Wrapper):
     """
     This should go before any modification of state and after any modification of rewards
     """
-    def __init__(self, env, exp_const=0.001, game_specific=False):
+    def __init__(self, env, exp_const=0.0002, game_specific=False):
         super(PseudoCountReward, self).__init__(env)
         self.exp_const = exp_const
 
