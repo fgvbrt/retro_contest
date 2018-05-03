@@ -27,7 +27,7 @@ def main(clients_fn, total_timesteps=int(5e7), weights_path=None, save_interval=
     with tf.Session(config=config):
         # Take more timesteps than we need to be sure that
         # we stop due to an exception.
-        ppo2.learn(policy=policies.CnnPolicy,
+        ppo2.learn(policy=policies.LstmPolicy,
                    env=clients_fn,
                    nsteps=4096,
                    nminibatches=8,
@@ -68,9 +68,9 @@ def run_train():
     if args.csv_file is not None:
         game_states = pd.read_csv(args.csv_file).values.tolist()
         clients_fn = SubprocVecEnv(
-            [functools.partial(sonic_util.make_rand_env, game_states) for _ in range(args.num_envs)])
+            [functools.partial(sonic_util.make_rand_env, game_states, False) for _ in range(args.num_envs)])
     else:
-        clients_fn = DummyVecEnv([functools.partial(sonic_util.make_remote_env, socket_dir="tmp/sock")])
+        clients_fn = DummyVecEnv([functools.partial(sonic_util.make_remote_env, stack=False, socket_dir="tmp/sock")])
 
     sleep(2)
     logger.configure('logs')
