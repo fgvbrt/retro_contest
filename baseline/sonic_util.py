@@ -30,7 +30,7 @@ def make(game, state, discrete_actions=False, bk2dir=None):
     return env
 
 
-def make_remote_env(stack=True, scale_rew=True, gray=True, socket_dir='/tmp'):
+def make_remote_env(stack=True, scale_rew=True, gray=True, exp_const=0.002, socket_dir='/tmp'):
     """
     Create an environment with some standard wrappers.
     """
@@ -41,7 +41,9 @@ def make_remote_env(stack=True, scale_rew=True, gray=True, socket_dir='/tmp'):
         env = RewardScaler(env)
 
     env = WarpFrame(env, gray)
-    env = PseudoCountReward(env, game_specific=False)
+
+    if exp_const > 0:
+        env = PseudoCountReward(env, exp_const, game_specific=False)
 
     if stack:
         env = FrameStack(env, 4)
@@ -49,26 +51,7 @@ def make_remote_env(stack=True, scale_rew=True, gray=True, socket_dir='/tmp'):
     return env
 
 
-def make_env(game, state, stack=True, scale_rew=True):
-    """
-    Create an environment with some standard wrappers.
-    """
-    env = make(game, state)
-    env = retro_contest.StochasticFrameSkip(env, n=4, stickprob=0.25)
-    env = gym.wrappers.TimeLimit(env, max_episode_steps=4500)
-
-    env = SonicDiscretizer(env)
-    env = AllowBacktracking(env)
-    if scale_rew:
-        env = RewardScaler(env)
-    env = WarpFrame(env)
-    if stack:
-        env = FrameStack(env, 4)
-    env = EpisodeInfo(env)
-    return env
-
-
-def make_rand_env(game_states, stack=True, scale_rew=True, gray=True):
+def make_rand_env(game_states, stack=True, scale_rew=True, gray=True, exp_const=0.002):
     """
     Create an environment with some standard wrappers.
     """
@@ -85,7 +68,9 @@ def make_rand_env(game_states, stack=True, scale_rew=True, gray=True):
         env = RewardScaler(env)
 
     env = WarpFrame(env, gray)
-    env = PseudoCountReward(env, game_specific=True)
+
+    if exp_const > 0:
+        env = PseudoCountReward(env, exp_const, game_specific=True)
 
     if stack:
         env = FrameStack(env, 4)

@@ -90,6 +90,9 @@ def run_train():
         add_boolean_flag(
             parser, 'load_adam_stats', True,
             help="When weights if provided also load adam statistics.")
+        parser.add_argument(
+            '--exp_const', type=float, default=0.0002,
+            help="Exploration constant.")
         return parser.parse_args()
 
     args = _parse_args()
@@ -105,12 +108,19 @@ def run_train():
 
     if args.csv_file is not None:
         game_states = pd.read_csv(args.csv_file).values.tolist()
-        clients_fn = SubprocVecEnv(
-            [functools.partial(sonic_util.make_rand_env, game_states, stack, gray=args.gray)
-             for _ in range(args.num_envs)])
+        clients_fn = SubprocVecEnv([
+            functools.partial(
+                sonic_util.make_rand_env, game_states, stack,
+                gray=args.gray,
+                exp_const=args.exp_const,)
+            for _ in range(args.num_envs)])
     else:
-        clients_fn = DummyVecEnv(
-            [functools.partial(sonic_util.make_remote_env, stack, gray=args.gray, socket_dir="tmp/sock")])
+        clients_fn = DummyVecEnv([functools.partial(
+            sonic_util.make_remote_env, stack,
+            gray=args.gray,
+            exp_const=args.exp_const,
+            socket_dir="tmp/sock")
+        ])
 
     sleep(2)
     logger.configure('logs')
