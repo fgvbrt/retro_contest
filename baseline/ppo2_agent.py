@@ -48,7 +48,7 @@ def main(policy, clients_fn, total_timesteps=int(5e7), weights_path=None, load_a
         # we stop due to an exception.
         ppo2.learn(policy=policy,
                    env=clients_fn,
-                   nsteps=2046,
+                   nsteps=2046 if policy == LstmPolicy else 4096,
                    nminibatches=8,
                    lam=0.95,
                    gamma=0.99,
