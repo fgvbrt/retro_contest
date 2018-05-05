@@ -5,13 +5,15 @@ Environments and wrappers for Sonic training.
 import gym
 import numpy as np
 
-from baselines.common.atari_wrappers import WarpFrame, FrameStack
+from baselines.common.atari_wrappers import FrameStack
 import gym_remote.client as grc
 import retro
 import retro_contest
 import random
-import cv2
 from collections import defaultdict
+from gym import spaces
+import cv2
+cv2.ocl.setUseOpenCL(False)
 
 
 def make(game, state, discrete_actions=False, bk2dir=None):
@@ -28,7 +30,7 @@ def make(game, state, discrete_actions=False, bk2dir=None):
     return env
 
 
-def make_remote_env(stack=True, scale_rew=True, socket_dir='/tmp'):
+def make_remote_env(stack=True, scale_rew=True, gray=True, socket_dir='/tmp'):
     """
     Create an environment with some standard wrappers.
     """
@@ -38,7 +40,7 @@ def make_remote_env(stack=True, scale_rew=True, socket_dir='/tmp'):
     if scale_rew:
         env = RewardScaler(env)
 
-    env = WarpFrame(env)
+    env = WarpFrame(env, gray)
     env = PseudoCountReward(env, game_specific=False)
 
     if stack:
@@ -66,7 +68,7 @@ def make_env(game, state, stack=True, scale_rew=True):
     return env
 
 
-def make_rand_env(game_states, stack=True, scale_rew=True):
+def make_rand_env(game_states, stack=True, scale_rew=True, gray=True):
     """
     Create an environment with some standard wrappers.
     """
@@ -82,7 +84,7 @@ def make_rand_env(game_states, stack=True, scale_rew=True):
     if scale_rew:
         env = RewardScaler(env)
 
-    env = WarpFrame(env)
+    env = WarpFrame(env, gray)
     env = PseudoCountReward(env, game_specific=True)
 
     if stack:
@@ -222,8 +224,10 @@ class PseudoCountReward(gym.Wrapper):
         r_plus = 0
         if self.exp_const > 0:
             # frame = cv2.resize(obs, (84, 84))
-            # frame = cv2.cvtColor(obs, cv2.COLOR_RGB2GRAY)
-            s_r = cv2.resize(obs, (42, 42)).ravel()
+            frame = obs
+            if frame.shape[2] > 1:
+                frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+            s_r = cv2.resize(frame, (42, 42)).ravel()
 
             if self.game_specific:
                 env_name = '{}_{}'.format(self.env.unwrapped.gamename, self.env.unwrapped.statename)
@@ -270,3 +274,22 @@ class PseudoCountReward(gym.Wrapper):
         self._ep_rew_total = 0
         self._exp_reward = 0
         return self.env.reset(**kwargs)
+
+
+class WarpFrame(gym.ObservationWrapper):
+    def __init__(self, env, gray=True):
+        """Warp frames to 84x84 as done in the Nature paper and later work."""
+        gym.ObservationWrapper.__init__(self, env)
+        self.width = 84
+        self.height = 84
+        self.gray = gray
+        n_ch = 1 if gray else 3
+        self.observation_space = spaces.Box(
+            low=0, high=255, shape=(self.height, self.width, n_ch), dtype=np.uint8)
+
+    def observation(self, frame):
+        if self.gray:
+            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+        frame = cv2.resize(frame, (self.width, self.height), interpolation=cv2.INTER_AREA).\
+            reshape(self.height, self.width, -1)
+        return frame

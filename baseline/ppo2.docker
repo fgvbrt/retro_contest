@@ -9,7 +9,7 @@ RUN apt-get update && \
 # so we manually fetch the deps we need.
 RUN . ~/venv/bin/activate && \
     pip install scipy tqdm joblib zmq dill progressbar2 cloudpickle opencv-python pandas && \
-    pip install --no-deps git+https://github.com/fgvbrt/baselines.git@ca701ea2c3853364ee2f0079ae35dad3991b703e && \
+    pip install --no-deps git+https://github.com/fgvbrt/baselines.git@d8a6fa55ef1eafa3cc3714821e79760a935b3eba && \
     pip install gym-retro && \
     git clone https://github.com/openai/retro-contest.git && cd retro-contest/support && \
     pip install .
