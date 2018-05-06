@@ -30,28 +30,35 @@ def make(game, state, discrete_actions=False, bk2dir=None):
     return env
 
 
-def make_remote_env(stack=True, scale_rew=True, gray=True, exp_const=0.002, socket_dir='/tmp'):
+def make_remote_env(stack=True, scale_rew=True, gray=True,  exp_type='obs', exp_const=0.002, socket_dir='/tmp'):
     """
     Create an environment with some standard wrappers.
     """
     env = grc.RemoteEnv(socket_dir)
+    env = BackupOriginalData(env)
     env = SonicDiscretizer(env)
     env = AllowBacktracking(env)
+
     if scale_rew:
         env = RewardScaler(env)
 
     env = WarpFrame(env, gray)
 
     if exp_const > 0:
-        env = PseudoCountReward(env, exp_const, game_specific=False)
+        if exp_type == 'obs':
+            env = ObsExplorationReward(env, exp_const, game_specific=False)
+        elif exp_type == 'x':
+            env = XExplorationReward(env, exp_const, game_specific=False)
 
     if stack:
         env = FrameStack(env, 4)
+
     env = EpisodeInfo(env)
+
     return env
 
 
-def make_rand_env(game_states, stack=True, scale_rew=True, gray=True, exp_const=0.002):
+def make_rand_env(game_states, stack=True, scale_rew=True, gray=True, exp_type='x', exp_const=0.002):
     """
     Create an environment with some standard wrappers.
     """
@@ -60,21 +67,29 @@ def make_rand_env(game_states, stack=True, scale_rew=True, gray=True, exp_const=
 
     env = RandomEnvironmen(env, game_states)
     env = retro_contest.StochasticFrameSkip(env, n=4, stickprob=0.25)
+
+    env = BackupOriginalData(env)
     env = gym.wrappers.TimeLimit(env, max_episode_steps=4500)
 
     env = SonicDiscretizer(env)
     env = AllowBacktracking(env)
+
     if scale_rew:
         env = RewardScaler(env)
 
     env = WarpFrame(env, gray)
 
     if exp_const > 0:
-        env = PseudoCountReward(env, exp_const, game_specific=True)
+        if exp_type == 'obs':
+            env = ObsExplorationReward(env, exp_const, game_specific=True)
+        elif exp_type == 'x':
+            env = XExplorationReward(env, exp_const, game_specific=True)
 
     if stack:
         env = FrameStack(env, 4)
+
     env = EpisodeInfo(env)
+
     return env
 
 
@@ -109,6 +124,30 @@ class RewardScaler(gym.RewardWrapper):
     """
     def reward(self, reward):
         return reward * 0.01
+
+
+class BackupOriginalData(gym.Wrapper):
+    """
+    Backup all original information. Should be first wrapper
+    """
+    def __init__(self, env, reward=True, observation=False):
+        super(BackupOriginalData, self).__init__(env)
+        self._reward = reward
+        self._observation = observation
+
+    def reset(self, **kwargs):
+        return self.env.reset(**kwargs)
+
+    def step(self, action):
+        obs, rew, done, info = self.env.step(action)
+        if self._reward or self._observation:
+            info['original'] = {}
+            if self._reward:
+                info['original']['rew'] = rew
+            if self._observation:
+                info['original']['obs'] = obs
+
+        return obs, rew, done, info
 
 
 class AllowBacktracking(gym.Wrapper):
@@ -176,6 +215,9 @@ class RandomEnvironmen(gym.Wrapper):
         super(RandomEnvironmen, self).__init__(env)
         self.game_states = game_states
 
+    def step(self, action):
+        return self.env.step(action)
+
     def reset(self, **kwargs):
         self.env.close()
         game, state = random.choice(self.game_states)
@@ -183,12 +225,75 @@ class RandomEnvironmen(gym.Wrapper):
         return self.env.reset(**kwargs)
 
 
-class PseudoCountReward(gym.Wrapper):
+class XExplorationReward(gym.Wrapper):
     """
     This should go before any modification of state and after any modification of rewards
     """
     def __init__(self, env, exp_const=0.0002, game_specific=False):
-        super(PseudoCountReward, self).__init__(env)
+        super(XExplorationReward, self).__init__(env)
+        self.exp_const = exp_const
+        self._cur_x = 0
+        self._exp_reward = 0
+        self._ep_rew_total = 0
+
+        env = env.unwrapped
+
+        if game_specific and hasattr(env, "gamename") and hasattr(env, "statename"):
+            self.pseudo_counts = defaultdict(lambda: np.zeros(9000, dtype='int'))
+            self.game_specific = True
+        else:
+            self.pseudo_counts = np.zeros(9000, dtype='int')
+            self.game_specific = False
+
+    def reset(self, **kwargs):
+        self._cur_x = 0
+        self._ep_rew_total = 0
+        self._exp_reward = 0
+        return self.env.reset(**kwargs)
+
+    def step(self, action):
+        obs, rew, done, info = self.env.step(action)
+
+        r_plus = 0
+        self._cur_x += info['original']['rew']
+        if self.exp_const > 0:
+
+            if self.game_specific:
+                env_name = '{}_{}'.format(self.env.unwrapped.gamename, self.env.unwrapped.statename)
+                pseudo_counts = self.pseudo_counts[env_name]
+            else:
+                pseudo_counts = self.pseudo_counts
+
+            i = int(min(self._cur_x, 8999))
+            cnt = pseudo_counts[i]
+            pseudo_counts[i] += 1
+
+            r_plus = self.exp_const / np.sqrt(cnt + 0.01)
+
+        info['rew_exp'] = r_plus
+        self._exp_reward += r_plus
+        self._ep_rew_total += rew
+        rew += r_plus
+
+        if done:
+            if "episode" not in info:
+                info["episode"] = {"r": self._ep_rew_total, "r_exp": self._exp_reward}
+            elif isinstance(info["episode"], dict):
+                info["episode"]["r_exp"] = self._exp_reward
+                if "r" not in info["episode"]:
+                    info["episode"]["r"] = self._ep_rew_total
+            self._ep_rew_total = 0
+            self._exp_reward = 0
+
+        return obs, rew, done, info
+
+
+class ObsExplorationReward(gym.Wrapper):
+    """
+    This should go before any modification of state and after any modification of rewards
+    """
+    def __init__(self, env, exp_const=0.0002, game_specific=False):
+        super(ObsExplorationReward, self).__init__(env)
         self.exp_const = exp_const
 
         env = env.unwrapped

@@ -88,8 +88,11 @@ def run_train():
             '--adam_stats', default='weight_stats', choices=['all', 'weight_stats', 'none'],
             help="Adams params to restore.")
         parser.add_argument(
-            '--exp_const', type=float, default=0.0002,
+            '--exp_const', type=float, default=0.005,
             help="Exploration constant.")
+        parser.add_argument(
+            '--exp_type', type=str, default='x', choices=['x', 'obs', 'none'],
+            help="Exploration type.")
         add_boolean_flag(
             parser, 'gray', True,
             help="Convert image to grayscale.")
@@ -112,6 +115,7 @@ def run_train():
             functools.partial(
                 sonic_util.make_rand_env, game_states, stack,
                 gray=args.gray,
+                exp_type=args.exp_type,
                 exp_const=args.exp_const,)
             for _ in range(args.num_envs)])
     else:
@@ -119,6 +123,7 @@ def run_train():
             sonic_util.make_remote_env, stack,
             gray=args.gray,
             exp_const=args.exp_const,
+            exp_type=args.exp_type,
             socket_dir="tmp/sock")
         ])
 
