@@ -39,7 +39,7 @@ def add_boolean_flag(parser, name, default=False, help=None):
     parser.add_argument("--no-" + name, action="store_false", dest=dest)
 
 
-def main(policy, clients_fn, total_timesteps=int(5e7), weights_path=None, load_adam_stats=True, save_interval=0):
+def main(policy, clients_fn, total_timesteps=int(5e7), weights_path=None, adam_stats='all', save_interval=0):
     """Run PPO until the environment throws an exception."""
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True # pylint: disable=E1101
@@ -60,7 +60,7 @@ def main(policy, clients_fn, total_timesteps=int(5e7), weights_path=None, load_a
                    total_timesteps=total_timesteps,
                    save_interval=save_interval,
                    weights_path=weights_path,
-                   load_adam_stats=load_adam_stats)
+                   adam_stats=adam_stats)
 
 
 def run_train():
@@ -84,15 +84,15 @@ def run_train():
         parser.add_argument(
             '--policy', type=str, default='cnn', choices=['lstm', 'cnn'],
             help="Policy to use.")
-        add_boolean_flag(
-            parser, 'gray', True,
-            help="Convert image to grayscale.")
-        add_boolean_flag(
-            parser, 'load_adam_stats', True,
-            help="When weights if provided also load adam statistics.")
+        parser.add_argument(
+            '--adam_stats', default='weight_stats', choices=['all', 'weight_stats', 'none'],
+            help="Adams params to restore.")
         parser.add_argument(
             '--exp_const', type=float, default=0.0002,
             help="Exploration constant.")
+        add_boolean_flag(
+            parser, 'gray', True,
+            help="Convert image to grayscale.")
         return parser.parse_args()
 
     args = _parse_args()
@@ -124,7 +124,7 @@ def run_train():
 
     sleep(2)
     logger.configure('logs')
-    main(policy, clients_fn, args.steps, args.weights_path, args.load_adam_stats, args.save_interval)
+    main(policy, clients_fn, args.steps, args.weights_path, args.adam_stats, args.save_interval)
 
 
 if __name__ == '__main__':
