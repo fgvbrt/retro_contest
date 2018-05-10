@@ -88,7 +88,7 @@ def run_train():
             '--adam_stats', default='weight_stats', choices=['all', 'weight_stats', 'none'],
             help="Adams params to restore.")
         parser.add_argument(
-            '--exp_const', type=float, default=0.001,
+            '--exp_const', type=float, default=0.005,
             help="Exploration constant.")
         parser.add_argument(
             '--exp_type', type=str, default='x', choices=['x', 'obs', 'none'],

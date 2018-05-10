@@ -51,7 +51,7 @@ def make_remote_env(stack=True, scale_rew=True, gray=True,  exp_type='obs', exp_
             env = XExplorationReward(env, exp_const, game_specific=False)
 
     if stack:
-        env = FrameStack(env, 4)
+        env = FrameStack(env, 2)
 
     env = EpisodeInfo(env)
 
@@ -86,7 +86,7 @@ def make_rand_env(game_states, stack=True, scale_rew=True, gray=True, exp_type='
             env = XExplorationReward(env, exp_const, game_specific=True)
 
     if stack:
-        env = FrameStack(env, 4)
+        env = FrameStack(env, 2)
 
     env = EpisodeInfo(env)
 
