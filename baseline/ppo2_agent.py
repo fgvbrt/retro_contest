@@ -40,7 +40,8 @@ def main(clients_fn, total_timesteps=int(5e7), weights_path=None, save_interval=
                    cliprange=lambda _: 0.1,
                    total_timesteps=total_timesteps,
                    save_interval=save_interval,
-                   weights_path=weights_path)
+                   weights_path=weights_path,
+                   nmixup=2)
 
 
 def run_train():
