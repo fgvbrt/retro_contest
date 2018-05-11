@@ -9,7 +9,6 @@ import tensorflow as tf
 from baselines.common.vec_env.dummy_vec_env import DummyVecEnv
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
 import baselines.ppo2.ppo2 as ppo2
-import baselines.ppo2.policies as policies
 import gym_remote.exceptions as gre
 import functools
 import argparse
@@ -39,7 +38,8 @@ def add_boolean_flag(parser, name, default=False, help=None):
     parser.add_argument("--no-" + name, action="store_false", dest=dest)
 
 
-def main(policy, clients_fn, total_timesteps=int(5e7), weights_path=None, adam_stats='all', save_interval=0):
+def main(policy, clients_fn, total_timesteps=int(5e7), weights_path=None,
+         adam_stats='all', save_interval=0, nmixup=3):
     """Run PPO until the environment throws an exception."""
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True # pylint: disable=E1101
@@ -60,7 +60,8 @@ def main(policy, clients_fn, total_timesteps=int(5e7), weights_path=None, adam_s
                    total_timesteps=total_timesteps,
                    save_interval=save_interval,
                    weights_path=weights_path,
-                   adam_stats=adam_stats)
+                   adam_stats=adam_stats,
+                   nmixup=nmixup)
 
 
 def run_train():
@@ -72,6 +73,9 @@ def run_train():
         parser.add_argument(
             '--num_envs', type=int, default=int(1.5 * cpu_count()) - 1,
             help="Number of parallele environments. Only if csv file is provided.")
+        parser.add_argument(
+            '--nmixup', type=int, default=3,
+            help="Number of mixup environments.")
         parser.add_argument(
             '--weights_path', type=str, default=None,
             help="filename with weights")
@@ -88,7 +92,7 @@ def run_train():
             '--adam_stats', default='weight_stats', choices=['all', 'weight_stats', 'none'],
             help="Adams params to restore.")
         parser.add_argument(
-            '--exp_const', type=float, default=0.001,
+            '--exp_const', type=float, default=0.005,
             help="Exploration constant.")
         parser.add_argument(
             '--exp_type', type=str, default='x', choices=['x', 'obs', 'none'],
@@ -118,6 +122,7 @@ def run_train():
                 exp_type=args.exp_type,
                 exp_const=args.exp_const,)
             for _ in range(args.num_envs)])
+        nmixup = args.nmixup
     else:
         clients_fn = DummyVecEnv([functools.partial(
             sonic_util.make_remote_env, stack,
@@ -126,10 +131,11 @@ def run_train():
             exp_type=args.exp_type,
             socket_dir="tmp/sock")
         ])
+        nmixup = 0
 
     sleep(2)
     logger.configure('logs')
-    main(policy, clients_fn, args.steps, args.weights_path, args.adam_stats, args.save_interval)
+    main(policy, clients_fn, args.steps, args.weights_path, args.adam_stats, args.save_interval, nmixup)
 
 
 if __name__ == '__main__':
