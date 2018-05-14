@@ -380,9 +380,9 @@ class ESAtariPolicy(Policy):
         If random_stream is provided, the rollout will take noisy actions with noise drawn from that stream.
         Otherwise, no action noise will be added.
         """
-        env_timestep_limit = env.spec.tags.get('wrapper_config.TimeLimit.max_episode_steps')
+        # env_timestep_limit = env.spec.tags.get('wrapper_config.TimeLimit.max_episode_steps')
 
-        timestep_limit = env_timestep_limit if timestep_limit is None else min(timestep_limit, env_timestep_limit)
+        # timestep_limit = env_timestep_limit if timestep_limit is None else min(timestep_limit, env_timestep_limit)
         rews = []; novelty_vector = []
         t = 0
 
@@ -397,8 +397,8 @@ class ESAtariPolicy(Policy):
 
         ob = env.reset()
         self.act(self.ref_list, random_stream=random_stream) #passing ref batch through network
-
-        for _ in range(timestep_limit):
+        done = False
+        while not done:
             start_time = time.time()
             ac = self.act([ob[None], False], random_stream=random_stream)[0]
 
@@ -407,7 +407,7 @@ class ESAtariPolicy(Policy):
 
             start_time = time.time()
             ob, rew, done, info = env.step(ac)
-            ram = env.unwrapped._get_ram() # extracts RAM state information
+            ram = [info['x'], info['y']]
 
             if save_obs:
                obs.append(ob)
@@ -450,6 +450,7 @@ class GAAtariPolicy(Policy):
         x = o
         x = self.nonlin(U.conv(x, name='conv1', num_outputs=16, kernel_size=8, stride=4, std=1.0))
         x = self.nonlin(U.conv(x, name='conv2', num_outputs=32, kernel_size=4, stride=2, std=1.0))
+        x = self.nonlin(U.conv(x, name='conv3', num_outputs=64, kernel_size=3, stride=1, std=1.0))
 
         x = U.flattenallbut0(x)
         x = self.nonlin(U.dense(x, 256, 'fc', U.normc_initializer(1.0), std=1.0))
@@ -499,14 +500,15 @@ class GAAtariPolicy(Policy):
                 obs.append(ob)
             ob, rew, done, info = env.step(ac)
             rews.append(rew)
-
+            # ram = [info['x'], info['y']]
+            # novelty_vector.append(ram)
             t += 1
             if render:
                 env.render()
 
         # Copy over final positions to the max timesteps
         rews = np.array(rews, dtype=np.float32)
-        # novelty_vector = env.unwrapped.data._get_ram() # extracts RAM state information
+
         if save_obs:
             return rews, t, np.array(obs)#, np.array(novelty_vector)
         return rews, t#, np.array(novelty_vector)

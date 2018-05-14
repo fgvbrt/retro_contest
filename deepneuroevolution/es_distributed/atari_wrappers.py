@@ -266,6 +266,7 @@ class AllowBacktracking(gym.Wrapper):
         super(AllowBacktracking, self).__init__(env)
         self._cur_x = 0
         self._max_x = 0
+        self.real_reward = 0
 
     def reset(self, **kwargs): # pylint: disable=E0202
         self._cur_x = 0
@@ -274,10 +275,12 @@ class AllowBacktracking(gym.Wrapper):
 
     def step(self, action): # pylint: disable=E0202
         obs, rew, done, info = self.env.step(action)
+        self.real_reward = rew
         self._cur_x += rew
         rew = max(0, self._cur_x - self._max_x)
         self._max_x = max(self._max_x, self._cur_x)
         return obs, rew, done, info
+
 
 
 class WarpFrame(gym.ObservationWrapper):
@@ -334,13 +337,27 @@ class RandomEnvironment(gym.Wrapper):
 #     env = ScaledFloatFrame(env)
 #     return env
 
+def _process_frame84(frame):
+    frame = cv2.resize(frame, (84, 84), interpolation=cv2.INTER_AREA)
+    frame = frame.mean(2, keepdims=True)
+    frame = frame.astype(np.float32)
+    frame *= (1.0 / 255.0)
+    frame = np.moveaxis(frame, -1, 0)
+    return frame
 
-def wrap_deepmind(env="", game_states=None):
-    game, state = random.choice(game_states)
-    env = make(game, state)
+class SonicRescale84x84(gym.ObservationWrapper):
+    def __init__(self, env=None):
+        super(SonicRescale84x84, self).__init__(env)
+        self.observation_space = Box(0.0, 1.0, [1, 84, 84])
+
+    def observation(self, observation):
+        return _process_frame84(observation)
+
+def wrap_deepmind(env_id, state_id, game_states=None):
+    env = make(game=env_id, state=state_id)
     env = RandomEnvironment(env, game_states)
     env = SonicDiscretizer(env)
-    env = WarpFrame(env)
+    env = SonicRescale84x84(env)
     env = AllowBacktracking(env)
     env = FrameStack(env, 4)
     return env

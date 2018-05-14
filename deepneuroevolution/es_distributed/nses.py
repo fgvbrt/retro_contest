@@ -8,6 +8,7 @@ import numpy as np
 
 from .dist import MasterClient, WorkerClient
 from .es import *
+import pandas as pd
 
 def euclidean_distance(x, y):
     n, m = len(x), len(y)
@@ -42,10 +43,11 @@ def setup_env(exp):
     import gym
     gym.undo_logger_setup()
     config = Config(**exp['config'])
-    env = gym.make(exp['env_id'])
-    if exp['policy']['type'] == "ESAtariPolicy":
-        from .atari_wrappers import wrap_deepmind
-        env = wrap_deepmind(env)
+    # env = gym.make(exp['env_id'])
+    # if exp['policy']['type'] == "ESAtariPolicy":
+    from .atari_wrappers import wrap_deepmind
+    game_states = pd.read_csv("train_small.csv").values.tolist()
+    env = wrap_deepmind('SonicTheHedgehog-Genesis', 'LabyrinthZone.Act1', game_states=game_states)
     return config, env
 
 def setup_policy(env, exp, single_threaded):
