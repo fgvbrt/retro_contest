@@ -448,9 +448,10 @@ class GAAtariPolicy(Policy):
 
     def _make_net(self, o):
         x = o
-        x = self.nonlin(U.conv(x, name='conv1', num_outputs=16, kernel_size=8, stride=4, std=1.0))
-        x = self.nonlin(U.conv(x, name='conv2', num_outputs=32, kernel_size=4, stride=2, std=1.0))
-        x = self.nonlin(U.conv(x, name='conv3', num_outputs=64, kernel_size=3, stride=1, std=1.0))
+        x = self.nonlin(U.conv(x, name='conv1', num_outputs=32, kernel_size=3, stride=2, padding="SAME", std=1.0))
+        x = self.nonlin(U.conv(x, name='conv2', num_outputs=32, kernel_size=3, stride=2, padding="SAME", std=1.0))
+        x = self.nonlin(U.conv(x, name='conv3', num_outputs=32, kernel_size=3, stride=2, padding="SAME", std=1.0))
+        x = self.nonlin(U.conv(x, name='conv4', num_outputs=32, kernel_size=3, stride=2, padding="SAME", std=1.0))
 
         x = U.flattenallbut0(x)
         x = self.nonlin(U.dense(x, 256, 'fc', U.normc_initializer(1.0), std=1.0))

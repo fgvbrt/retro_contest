@@ -15,7 +15,7 @@
   "env_id": "LabyrinthZone.Act1",
   "policy": {
     "args" : {
-      "nonlin_type": "relu"
+      "nonlin_type": "elu"
     },
     "type": "GAAtariPolicy"
   }

@@ -13,7 +13,7 @@ def setup(exp, single_threaded):
     # env = gym.make(exp['env_id'])
     # if exp['env_id'].endswith('NoFrameskip-v4'):
     from .atari_wrappers import wrap_deepmind
-    game_states = pd.read_csv("train_spring_yard.csv").values.tolist()
+    game_states = pd.read_csv("train_small.csv").values.tolist()
     env = wrap_deepmind('SonicTheHedgehog-Genesis', 'LabyrinthZone.Act1', game_states=game_states)
     sess = make_session(single_threaded=single_threaded)
     policy = getattr(policies, exp['policy']['type'])(env.observation_space, env.action_space, **exp['policy']['args'])
