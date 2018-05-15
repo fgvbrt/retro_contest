@@ -5,20 +5,32 @@ from gym.spaces.box import Box
 from collections import deque
 from gym import spaces
 from retro_contest.local import make
+import random
 
-
-def _process_frame42(frame):
-    frame = frame[34:34 + 160, :160]
-    # Resize by half, then down to 42x42 (essentially mipmapping). If
-    # we resize directly we lose pixels that, when mapped to 42x42,
-    # aren't close enough to the pixel boundary.
-    frame = cv2.resize(frame, (80, 80))
-    frame = cv2.resize(frame, (42, 42))
+def _process_frame84(frame):
+    frame = cv2.resize(frame, (84, 84), interpolation=cv2.INTER_AREA)
     frame = frame.mean(2, keepdims=True)
     frame = frame.astype(np.float32)
     frame *= (1.0 / 255.0)
-    frame = np.moveaxis(frame, -1, 0)
     return frame
+
+class WarpFrame(gym.ObservationWrapper):
+    def __init__(self, env, gray=True):
+        """Warp frames to 84x84 as done in the Nature paper and later work."""
+        gym.ObservationWrapper.__init__(self, env)
+        self.width = 84
+        self.height = 84
+        self.gray = gray
+        n_ch = 1 if gray else 3
+        self.observation_space = spaces.Box(
+            low=0, high=255, shape=(self.height, self.width, n_ch), dtype=np.uint8)
+
+    def observation(self, frame):
+        if self.gray:
+            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+        frame = cv2.resize(frame, (self.width, self.height), interpolation=cv2.INTER_AREA).\
+            reshape(self.height, self.width, -1)
+        return frame
 
 class NoopResetEnv(gym.Wrapper):
     def __init__(self, env, noop_max=30):
@@ -49,13 +61,13 @@ class NoopResetEnv(gym.Wrapper):
     def step(self, ac):
         return self.env.step(ac)
 
-class AtariRescale42x42(gym.ObservationWrapper):
+class SonicRescale84x84(gym.ObservationWrapper):
     def __init__(self, env=None):
-        super(AtariRescale42x42, self).__init__(env)
-        self.observation_space = Box(0.0, 1.0, [1, 42, 42])
+        super(SonicRescale84x84, self).__init__(env)
+        self.observation_space = Box(0.0, 1.0, [84, 84, 1], dtype=np.uint8)
 
     def observation(self, observation):
-        return _process_frame42(observation)
+        return _process_frame84(observation)
 
 class FrameStack(gym.Wrapper):
     def __init__(self, env, k):
@@ -145,10 +157,103 @@ class MaxAndSkipEnv(gym.Wrapper):
     def reset(self, **kwargs):
         return self.env.reset(**kwargs)
 
-def make_retro(env_id,state_id):
+class RandomEnvironment(gym.Wrapper):
+    """
+    Randomly choose level and state after reset is called.
+    Warning: this environment should be the first env Wrapper!
+    """
+    def __init__(self, env, game_states):
+        super(RandomEnvironment, self).__init__(env)
+        self.game_states = game_states
+
+    def reset(self, **kwargs):
+        self.env.close()
+        game, state = random.choice(self.game_states)
+        print("new game", game, state)
+        self.env = make(game, state)
+        return self.env.reset(**kwargs)
+
+class SonicDiscretizer(gym.ActionWrapper):
+    """
+    Wrap a gym-retro environment and make it use discrete
+    actions for the Sonic game.
+    """
+    def __init__(self, env):
+        super(SonicDiscretizer, self).__init__(env)
+        buttons = ["B", "A", "MODE", "START", "UP", "DOWN", "LEFT", "RIGHT", "C", "Y", "X", "Z"]
+        actions = [['LEFT'], ['RIGHT'], ['LEFT', 'DOWN'], ['RIGHT', 'DOWN'], ['DOWN'],
+                   ['DOWN', 'B'], ['B']]
+        self._actions = []
+        for action in actions:
+            arr = np.array([False] * 12)
+            for button in action:
+                arr[buttons.index(button)] = True
+            self._actions.append(arr)
+        self.action_space = gym.spaces.Discrete(len(self._actions))
+
+    def action(self, a): # pylint: disable=W0221
+        return self._actions[a].copy()
+
+
+class AllowBacktracking(gym.Wrapper):
+    """
+    Use deltas in max(X) as the reward, rather than deltas
+    in X. This way, agents are not discouraged too heavily
+    from exploring backwards if there is no way to advance
+    head-on in the level.
+    """
+    def __init__(self, env):
+        super(AllowBacktracking, self).__init__(env)
+        self._cur_x = 0
+        self._max_x = 0
+
+    def reset(self, **kwargs): # pylint: disable=E0202
+        self._cur_x = 0
+        self._max_x = 0
+        return self.env.reset(**kwargs)
+
+    def step(self, action): # pylint: disable=E0202
+        obs, rew, done, info = self.env.step(action)
+        self._cur_x += rew
+        rew = max(0, self._cur_x - self._max_x)
+        self._max_x = max(self._max_x, self._cur_x)
+        return obs, rew, done, info
+
+class RewardScaler(gym.RewardWrapper):
+    """
+    Bring rewards to a reasonable scale for PPO.
+    This is incredibly important and effects performance
+    drastically.
+    """
+    def reward(self, reward):
+        return reward * 0.01
+
+class SonicDiscretizer(gym.ActionWrapper):
+    """
+    Wrap a gym-retro environment and make it use discrete
+    actions for the Sonic game.
+    """
+    def __init__(self, env):
+        super(SonicDiscretizer, self).__init__(env)
+        buttons = ["B", "A", "MODE", "START", "UP", "DOWN", "LEFT", "RIGHT", "C", "Y", "X", "Z"]
+        actions = [['LEFT'], ['RIGHT'], ['LEFT', 'DOWN'], ['RIGHT', 'DOWN'], ['DOWN'],
+                   ['DOWN', 'B'], ['B']]
+        self._actions = []
+        for action in actions:
+            arr = np.array([False] * 12)
+            for button in action:
+                arr[buttons.index(button)] = True
+            self._actions.append(arr)
+        self.action_space = gym.spaces.Discrete(len(self._actions))
+
+    def action(self, a): # pylint: disable=W0221
+        return self._actions[a].copy()
+
+def make_retro(env_id,state_id, game_states=None):
     env = make(game=env_id, state=state_id)
-    env = AtariRescale42x42(env)
-    # env = NoopResetEnv(env, noop_max=30)
-    # env = MaxAndSkipEnv(env, skip=4)
+    env = RandomEnvironment(env, game_states)
+    env = SonicDiscretizer(env)
+    env = SonicRescale84x84(env)
+    env = AllowBacktracking(env)
     env = FrameStack(env, 4)
     return env

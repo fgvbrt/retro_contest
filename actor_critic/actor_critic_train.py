@@ -10,7 +10,7 @@ import torch.optim as optim
 from torch.autograd import Variable
 from torch.distributions import Categorical
 from envs import make_retro
-
+import pandas as pd
 parser = argparse.ArgumentParser(description='PyTorch actor-critic example')
 parser.add_argument('--gamma', type=float, default=0.99, metavar='G',
                     help='discount factor (default: 0.99)')
@@ -22,21 +22,13 @@ parser.add_argument('--record', action='store_true',
                     help='save video')
 
 args = parser.parse_args()
+game_states = pd.read_csv("train_large.csv").values.tolist()
 
-env = make_retro('SonicTheHedgehog-Genesis', 'LabyrinthZone.Act1')
+env = make_retro('SonicTheHedgehog-Genesis', 'LabyrinthZone.Act1', game_states)
 env.seed(args.seed)
 torch.manual_seed(args.seed)
 
-
 SavedAction = namedtuple('SavedAction', ['log_prob', 'value'])
-
-actions = [[1,0,0,0,0,0,0,0,0,0,0,0], # b
-        [0,0,0,0,0,0,0,1,0,0,0,0], # right
-        [0,0,0,0,0,0,1,0,0,0,0,0], # left
-        [0,0,0,0,0,1,0,0,0,0,0,0], # down
-        [0,0,0,0,0,1,1,0,0,0,0,0], # left down
-        [0,0,0,0,0,1,0,1,0,0,0,0], # right down
-        [1,0,0,0,0,1,0,0,0,0,0,0]] # down b
 
 class Policy(nn.Module):
     def __init__(self, num_inputs, action_space):
@@ -45,7 +37,7 @@ class Policy(nn.Module):
         self.conv2 = nn.Conv2d(32, 32, 3, stride=2, padding=1)
         self.conv3 = nn.Conv2d(32, 32, 3, stride=2, padding=1)
         self.conv4 = nn.Conv2d(32, 32, 3, stride=2, padding=1)
-        self.affine1 = nn.Linear(32*3*11, 256)
+        self.affine1 = nn.Linear(32*6, 256)
         self.action_head = nn.Linear(256, action_space)
         self.value_head = nn.Linear(256, 1)
 
@@ -57,16 +49,14 @@ class Policy(nn.Module):
         x = F.elu(self.conv2(x))
         x = F.elu(self.conv3(x))
         x = F.elu(self.conv4(x))
-        x = x.view(-1, 32*3*11)
+        x = x.view(-1, 32*6)
         x = F.elu(self.affine1(x))
         action_scores = self.action_head(x)
         state_values = self.value_head(x)
         return F.softmax(action_scores, dim=-1), state_values
 
-
-model = Policy(env.observation_space.shape[0], 7)
+model = Policy(env.observation_space.shape[0], env.action_space.n)
 optimizer = optim.Adam(model.parameters(), lr=1e-3)
-
 
 def select_action(state):
     state = torch.from_numpy(state).float().unsqueeze(0)
@@ -108,8 +98,9 @@ for i_episode in count(1):
     current_reward = 0
     done = False
     t = 0
+    flip = 0
     while not done:
-        action = actions[int(select_action(np.array(state)))]
+        action = select_action(np.array(state))
         state, reward, done, _ = env.step(action)
         # env.render()
         model.rewards.append(reward)
