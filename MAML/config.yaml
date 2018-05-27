@@ -1,0 +1,22 @@
+train_params:
+  max_steps: 100000000
+  lr: 0.0002
+  vf_coef: 0.5
+  ent_coef: 0.01
+  cliprange: 0.1
+  gamma: 0.99
+  lam: 0.95
+  n_steps: 4096
+  n_opt_epochs: 3
+  batch_size: 4096
+
+env_params:
+  exp_type: "x"
+  exp_const: 0.005
+  color: False
+  stack: 2
+  scale_rew: True
+
+log:
+  log_interval: 1
+  save_interval: 10

@@ -2,6 +2,8 @@ baseline/roms/Sonic*
 baseline/*.pkl
 baseline/results
 baseline/logs
+.ipynb_checkpoints
+*.ipynb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
