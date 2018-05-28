@@ -4,6 +4,13 @@ import torch.optim as optim
 import torch.nn.functional as F
 from torch.distributions import Categorical
 import utils
+import numpy as np
+
+
+def init_weights(m):
+    if isinstance(m, ) == nn.Linear:
+        m.weight.data.fill_(1.0)
+        print(m.weight)
 
 
 class NatureCNN(nn.Module):
@@ -21,6 +28,20 @@ class NatureCNN(nn.Module):
         self.action_head = nn.Linear(512, n_ac)
         self.value_head = nn.Linear(512, 1)
 
+        # initialize as in openai baselines
+        self._init()
+
+    def _init(self):
+        for m in (self.conv1, self.conv2, self.conv3, self.fc1):
+            nn.init.orthogonal_(m.weight, np.sqrt(2))
+            nn.init.constant_(m.bias, 0)
+
+        nn.init.orthogonal_(self.action_head.weight, 0.01)
+        nn.init.constant_(self.action_head.bias, 0.0)
+
+        nn.init.orthogonal_(self.value_head.weight, 1)
+        nn.init.constant_(self.value_head.bias, 0.0)
+
     def forward(self, inp):
         x = F.relu(self.conv1(inp))
         x = F.relu(self.conv2(x))
@@ -36,16 +57,29 @@ class NatureCNN(nn.Module):
 
 
 class CNNPolicy(object):
-    def __init__(self, ob_space, ac_space, vf_coef, ent_coef, lr):
+    def __init__(self, ob_space, ac_space, vf_coef, ent_coef, lr, max_grad_norm):
         self.model = NatureCNN(ac_space.n, ob_space)
         self.vf_coef = vf_coef
         self.ent_coef = ent_coef
         self.optimizer = optim.Adam(self.model.parameters(), lr)
+        self.max_grad_norm = max_grad_norm
         self.loss_names = ("pg_loss", "entropy", "vf_loss", "clipfrac", "approxkl")
 
     def value(self, obs):
         act_logits, vals = self.model(obs)
         return vals
+
+    def get_weight(self):
+        return self.model.state_dict()
+
+    def load_weights(self, weights):
+        return self.model.load_state_dict(weights)
+
+    def save(self, fname):
+        raise NotImplementedError()
+
+    def load(self, fname):
+        raise NotImplementedError()
 
     def step(self, obs, sample=True):
         # make batch of one
@@ -105,26 +139,7 @@ class CNNPolicy(object):
         self.optimizer.zero_grad()
         loss = pg_loss - entropy * self.ent_coef + vf_loss * self.vf_coef
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
         self.optimizer.step()
 
         return pg_loss, entropy, vf_loss, clipfrac, approxkl
-
-
-def test():
-    from gym.spaces import Box, Discrete
-    import numpy as np
-
-    obs_space = Box(low=0, high=255, shape=(84, 84, 2), dtype=np.uint8)
-    a_space = Discrete(10)
-
-    policy = CNNPolicy(obs_space, a_space, 1, 1, 1)
-
-    obs = torch.tensor(np.random.rand(10, 2, 84, 84).astype(np.float32))
-    returns = torch.FloatTensor(np.random.rand(10))
-    actions, logits, vals = policy.step(obs)
-
-    policy.train(1, obs, returns, actions, vals, logits)
-
-
-if __name__ == '__main__':
-    test()

@@ -30,7 +30,6 @@ def traj_segment_generator(model, env, horizon, sample):
         # Slight weirdness here because we need value function at time T
         # before returning segment [0, T-1] so we get the correct
         # terminal value
-        # TODO: enxtract correct information from info
         if t > 0 and t % horizon == 0:
             yield {
                 "ob": obs, "rew": rews,
@@ -52,7 +51,6 @@ def traj_segment_generator(model, env, horizon, sample):
         ob, rew, new, info = env.step(ac)
         rews[i] = rew
 
-        # TODO: we can extract useful information from info dict
         if new:
             # game_name = env.unwrapped.game_name
             # state_name = env.unwrapped.state_name
@@ -111,7 +109,7 @@ def train(args=None):
 
     model = CNNPolicy(
         env.observation_space, env.action_space, train_params["vf_coef"],
-        train_params["ent_coef"], train_params["lr"]
+        train_params["ent_coef"], train_params["lr"], train_params["max_grad_norm"]
     )
 
     seg_gen = traj_segment_generator(

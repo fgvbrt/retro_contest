@@ -6,9 +6,10 @@ train_params:
   cliprange: 0.1
   gamma: 0.99
   lam: 0.95
-  n_steps: 4096
+  n_steps: 4500
   n_opt_epochs: 3
-  batch_size: 4096
+  batch_size: 4500
+  max_grad_norm: 0.5
 
 env_params:
   exp_type: "x"
