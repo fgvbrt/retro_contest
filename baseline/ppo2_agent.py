@@ -38,6 +38,14 @@ def add_boolean_flag(parser, name, default=False, help=None):
     parser.add_argument("--no-" + name, action="store_false", dest=dest)
 
 
+def decay(start, end):
+    delta = start - end
+
+    def lr_decay(frac):
+        return start - frac * delta
+
+    return lr_decay
+
 def main(policy, clients_fn, total_timesteps=int(5e7), weights_path=None,
          adam_stats='all', save_interval=0, nmixup=3):
     """Run PPO until the environment throws an exception."""
@@ -48,14 +56,14 @@ def main(policy, clients_fn, total_timesteps=int(5e7), weights_path=None,
         # we stop due to an exception.
         ppo2.learn(policy=policy,
                    env=clients_fn,
-                   nsteps=2046 if policy == LstmPolicy else 4096,
-                   nminibatches=8,
+                   nsteps=2046 if policy == LstmPolicy else 4500,
+                   nminibatches=2,
                    lam=0.95,
                    gamma=0.99,
-                   noptepochs=3,
+                   noptepochs=20,
                    log_interval=1,
                    ent_coef=0.01,
-                   lr=lambda _: 2e-4,
+                   lr=decay(5e-4, 5e-5),
                    cliprange=lambda _: 0.1,
                    total_timesteps=total_timesteps,
                    save_interval=save_interval,
