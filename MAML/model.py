@@ -51,7 +51,7 @@ class NatureCNN(nn.Module):
         x = F.relu(self.fc1(x))
 
         act_logits = F.log_softmax(self.action_head(x), -1)
-        vals = self.value_head(x)
+        vals = self.value_head(x).squeeze(dim=1)
 
         return act_logits, vals
 
