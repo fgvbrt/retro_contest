@@ -19,6 +19,7 @@ class NatureCNN(nn.Module):
         nc, nh, nw = ob_space.shape
         out_h = utils.convs_out_dim(nh, [8, 4, 3], [0, 0, 0], [4, 2, 1])
         out_w = utils.convs_out_dim(nw, [8, 4, 3], [0, 0, 0], [4, 2, 1])
+        self.inp_shape = (1, nc, nh, nw)
         self.conv_out = out_w * out_h * 64
 
         self.conv1 = nn.Conv2d(nc, 32, kernel_size=8, stride=4)
@@ -41,6 +42,26 @@ class NatureCNN(nn.Module):
 
         nn.init.orthogonal_(self.value_head.weight, 1)
         nn.init.constant_(self.value_head.bias, 0.0)
+
+        # init gradients
+        tmp = torch.from_numpy(np.random.rand(*self.inp_shape).astype(np.float32))
+        tmp = self(tmp)
+        tmp_loss = tmp[0].mean() + tmp[0].mean()
+        tmp_loss.backward()
+        self.zero_grad()
+
+    def get_grads(self):
+        return [p.grad for p in self.parameters() if p.grad is not None]
+
+    def add_grad(self, grads):
+        # TODO: надо бы проверить, что верно проинициализировано
+        i = 0
+        for p in self.parameters():
+            if p.grad is not None:
+                p.grad.add_(grads[i])
+                i += 1
+        # check that all grads were processed
+        assert i == len(grads)
 
     def forward(self, inp):
         x = F.relu(self.conv1(inp))
@@ -69,7 +90,16 @@ class CNNPolicy(object):
         act_logits, vals = self.model(obs)
         return vals
 
-    def get_weight(self):
+    def get_grads(self):
+        return self.model.get_grads()
+
+    def add_grads(self, grads):
+        self.model.add_grad(grads)
+
+    def zero_grad(self):
+        self.model.zero_grad()
+
+    def get_weights(self):
         return self.model.state_dict()
 
     def load_weights(self, weights):
@@ -98,8 +128,7 @@ class CNNPolicy(object):
 
         return action, act_logits[action], vals
 
-    def train(self, cliprange, obs, advs, returns, actions, old_vals, old_logits):
-
+    def _backprop(self, cliprange, obs, advs, returns, actions, old_vals, old_logits):
         # TODO: may store all of it in tensors already
         obs = torch.from_numpy(obs)
         actions = torch.from_numpy(actions)
@@ -136,10 +165,25 @@ class CNNPolicy(object):
         clipfrac = torch.mean((torch.abs(ratio - 1.0) > cliprange).type(torch.FloatTensor))
         approxkl = .5 * torch.mean(log_ratio ** 2)
 
+        return pg_loss, entropy, vf_loss, clipfrac, approxkl
+
+    def train(self, cliprange, obs, advs, returns, actions, old_vals, old_logits):
+        pg_loss, entropy, vf_loss, clipfrac, approxkl = \
+            self._backprop(cliprange, obs, advs, returns, actions, old_vals, old_logits)
+
         self.optimizer.zero_grad()
         loss = pg_loss - entropy * self.ent_coef + vf_loss * self.vf_coef
         loss.backward()
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
         self.optimizer.step()
+
+        return pg_loss, entropy, vf_loss, clipfrac, approxkl
+
+    def accumulate_grad(self, cliprange, obs, advs, returns, actions, old_vals, old_logits):
+        pg_loss, entropy, vf_loss, clipfrac, approxkl = \
+            self._backprop(cliprange, obs, advs, returns, actions, old_vals, old_logits)
+
+        loss = pg_loss - entropy * self.ent_coef + vf_loss * self.vf_coef
+        loss.backward()
 
         return pg_loss, entropy, vf_loss, clipfrac, approxkl

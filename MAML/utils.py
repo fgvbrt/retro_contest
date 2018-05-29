@@ -1,9 +1,7 @@
-import retro
-import gym
-import gym_remote.client as grc
-import retro_contest
-from baselines.common.atari_wrappers import ScaledFloatFrame
+import base64
+import pickle
 from copy import  deepcopy
+
 
 def merge_dictionaries(a, b, path_to_root=None, extend_lists=False):
     """
@@ -60,3 +58,17 @@ def convs_out_dim(in_n, ks, ps, ss):
     for k, p, s in zip(ks, ps, ss):
         in_n = conv_out_dim(in_n, k, p, s)
     return in_n
+
+
+def unpickle(data_dict):
+    assert isinstance(data_dict, dict) and 'data' in data_dict and 'encoding' in data_dict
+
+    data = data_dict["data"]
+    encoding = data_dict["encoding"]
+
+    if encoding == "base64":
+        res = pickle.loads(base64.b64decode(data))
+    else:
+        raise ValueError('unsopported encoding {}'.format(encoding))
+
+    return res

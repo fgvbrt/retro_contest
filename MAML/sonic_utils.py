@@ -13,11 +13,13 @@ import gym_remote.client as grc
 import retro_contest
 from baselines.common.atari_wrappers import ScaledFloatFrame
 from collections import deque
+from copy import deepcopy
 cv2.ocl.setUseOpenCL(False)
 
 
 def make_from_config(config, maml=False):
     # local training
+    config = deepcopy(config)
     if "game_states" in config:
         game_states = pd.read_csv(config["game_states"]).values.tolist()
         config["game_states"] = game_states
@@ -122,8 +124,8 @@ def make_maml_env(game_states, stack=2, scale_rew=True, color=False, exp_type='x
     game, state = game_states[0]
     env = make(game, state)
 
-    env = RandomEnvironmen2(env, game_states)
-    env = retro_contest.StochasticFrameSkip(env, n=4, stickprob=0.25)
+    env_rand = RandomEnvironmen2(env, game_states)
+    env = retro_contest.StochasticFrameSkip(env_rand, n=4, stickprob=0.25)
 
     env = BackupOriginalData(env)
     env = gym.wrappers.TimeLimit(env, max_episode_steps=max_episode_steps)
@@ -147,6 +149,8 @@ def make_maml_env(game_states, stack=2, scale_rew=True, color=False, exp_type='x
 
     env = ScaledFloatFrame(env)
     env = EpisodeInfo(env)
+
+    env.sample = env_rand.sample
 
     return env
 
@@ -292,7 +296,7 @@ class RandomEnvironmen2(gym.Wrapper):
         super(RandomEnvironmen2, self).__init__(env)
         self.game_states = game_states
 
-    def sample_env(self):
+    def sample(self):
         game, state = random.choice(self.game_states)
         self.env.close()
         self.env = make(game, state)
