@@ -1,3 +1,6 @@
+import os
+os.environ['OMP_NUM_THREADS'] = '1'
+
 import Pyro4
 import train
 import pickle
@@ -5,6 +8,8 @@ import sonic_utils
 from model import CNNPolicy
 import utils
 from time import sleep
+import torch
+torch.set_num_threads(1)
 
 
 def find_workers(prefix):
@@ -67,6 +72,7 @@ def run_maml():
     )
 
     workers = find_workers("worker")
+    init_workers(workers, config, model.get_weights())
 
     # start run
     workers_results = {w: Pyro4.Future(w.run)() for w in workers}
@@ -83,4 +89,8 @@ def run_maml():
 
 
 if __name__ == '__main__':
-    run_maml()
+    try:
+        run_maml()
+    except:
+        print("Pyro traceback:")
+        print("".join(Pyro4.util.getPyroTraceback()))

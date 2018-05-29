@@ -11,8 +11,8 @@ train_params:
   n_opt_epochs: 3
   batch_size: 4500
   max_grad_norm: 0.5
-  train_traj: 10
-  meta_n_steps: 45000
+  n_traj: 3
+  n_traj2: 3
 
 env_params:
   exp_type: "x"

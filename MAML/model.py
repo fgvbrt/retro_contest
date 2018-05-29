@@ -46,7 +46,7 @@ class NatureCNN(nn.Module):
         # init gradients
         tmp = torch.from_numpy(np.random.rand(*self.inp_shape).astype(np.float32))
         tmp = self(tmp)
-        tmp_loss = tmp[0].mean() + tmp[0].mean()
+        tmp_loss = tmp[0].mean() + tmp[1].mean()
         tmp_loss.backward()
         self.zero_grad()
 
@@ -82,9 +82,10 @@ class CNNPolicy(object):
         self.model = NatureCNN(ac_space.n, ob_space)
         self.vf_coef = vf_coef
         self.ent_coef = ent_coef
-        self.optimizer = optim.Adam(self.model.parameters(), lr)
         self.max_grad_norm = max_grad_norm
         self.loss_names = ("pg_loss", "entropy", "vf_loss", "clipfrac", "approxkl")
+
+        self.optimizer = optim.Adam(self.model.parameters(), lr)
 
     def value(self, obs):
         act_logits, vals = self.model(obs)
@@ -128,13 +129,13 @@ class CNNPolicy(object):
 
         return action, act_logits[action], vals
 
-    def _backprop(self, cliprange, obs, advs, returns, actions, old_vals, old_logits):
+    def _backprop(self, cliprange, obs, returns, actions, old_vals, old_logits):
         # TODO: may store all of it in tensors already
+        # TODO: calculate advantages for memory efficiency reasons
         obs = torch.from_numpy(obs)
         actions = torch.from_numpy(actions)
         old_vals = torch.from_numpy(old_vals)
         old_logits = torch.from_numpy(old_logits)
-        advs = torch.from_numpy(advs)
         returns = torch.from_numpy(returns)
 
         # current logits and vals
@@ -143,6 +144,7 @@ class CNNPolicy(object):
         distr = Categorical(logits=act_logits)
 
         # advantage
+        advs = returns - old_vals
         advs = (advs - advs.mean()) / (advs.std() + 1e-8)
 
         # policy loss
@@ -167,9 +169,9 @@ class CNNPolicy(object):
 
         return pg_loss, entropy, vf_loss, clipfrac, approxkl
 
-    def train(self, cliprange, obs, advs, returns, actions, old_vals, old_logits):
+    def train(self, cliprange, obs, returns, actions, old_vals, old_logits):
         pg_loss, entropy, vf_loss, clipfrac, approxkl = \
-            self._backprop(cliprange, obs, advs, returns, actions, old_vals, old_logits)
+            self._backprop(cliprange, obs, returns, actions, old_vals, old_logits)
 
         self.optimizer.zero_grad()
         loss = pg_loss - entropy * self.ent_coef + vf_loss * self.vf_coef
@@ -179,9 +181,9 @@ class CNNPolicy(object):
 
         return pg_loss, entropy, vf_loss, clipfrac, approxkl
 
-    def accumulate_grad(self, cliprange, obs, advs, returns, actions, old_vals, old_logits):
+    def accumulate_grad(self, cliprange, obs, returns, actions, old_vals, old_logits):
         pg_loss, entropy, vf_loss, clipfrac, approxkl = \
-            self._backprop(cliprange, obs, advs, returns, actions, old_vals, old_logits)
+            self._backprop(cliprange, obs, returns, actions, old_vals, old_logits)
 
         loss = pg_loss - entropy * self.ent_coef + vf_loss * self.vf_coef
         loss.backward()

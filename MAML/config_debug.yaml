@@ -1,10 +1,9 @@
 train_params:
-  n_steps: 100
+  n_steps: 4500
   n_opt_epochs: 3
-  batch_size: 10
-  max_grad_norm: 0.5
-  train_traj: 1
-  meta_n_steps: 100
+  batch_size: 4500
+  n_traj1: 3
+  n_traj1: 3
 
 env_params:
   game_states: "train_debug.csv"

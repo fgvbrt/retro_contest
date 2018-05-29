@@ -1,15 +1,20 @@
+import os
+os.environ['OMP_NUM_THREADS'] = '1'
+
 import numpy as np
 import Pyro4
 import sonic_utils
 from model import CNNPolicy
-from train import add_vtarg_and_adv
+from train import add_vtarg
 import argparse
 import pickle
 import utils
 from baselines import logger
 from time import time
 from collections import deque
+import torch
 
+torch.set_num_threads(1)
 logger.set_level(logger.DEBUG)
 
 
@@ -81,7 +86,11 @@ class MAMLWorker(object):
         train_params = config['train_params']
         env_params = config['env_params']
 
+        if self.env is not None:
+            self.env.close()
+
         self.env = sonic_utils.make_from_config(env_params, True)
+
         self.model = CNNPolicy(
             self.env.observation_space, self.env.action_space, train_params["vf_coef"],
             train_params["ent_coef"], train_params["lr"], train_params["max_grad_norm"]
@@ -100,35 +109,42 @@ class MAMLWorker(object):
     def initialized(self):
         return self.model is not None and self.env is not None and self.config is not None
 
-    def _train(self):
-
-        ob = None
-        new = True
-
+    def _train(self, n_traj, train=True, ob=None, new=True):
         train_params = self.config['train_params']
+
+        if train:
+            train_fn = self.model.train
+            n_opt_epochs = train_params["n_opt_epochs"]
+        else:
+            train_fn = self.model.accumulate_grad
+            n_opt_epochs = 1
+
         seg_inds = np.arange(train_params['n_steps'])
         n_batches = train_params["n_steps"] // train_params["batch_size"]
         loss_vals = []
-        for i in range(train_params["train_traj"]):
+        for i in range(n_traj):
 
             # sample trajectory
             traj = sample_trajectory(self.model, self.env, train_params["n_steps"], True, ob, new)
-            add_vtarg_and_adv(traj, train_params['gamma'],  train_params['lam'])
+            add_vtarg(traj, train_params['gamma'], train_params['lam'])
 
             ob = traj["last_ob"]
             new = traj["last_new"]
 
+            if not train:
+                self.epinfobuf.extend(traj['ep_infos'])
+
             # run training
-            for _ in range(train_params["n_opt_epochs"]):
+            for _ in range(n_opt_epochs):
                 np.random.shuffle(seg_inds)
                 for i in range(n_batches):
                     start = i * train_params["batch_size"]
                     end = (i + 1) * train_params["batch_size"]
                     inds = seg_inds[start:end]
 
-                    losses = self.model.train(
+                    losses = train_fn(
                         train_params['cliprange'], traj['ob'][inds],
-                        traj["adv"][inds], traj['tdlamret'][inds], traj['ac'][inds],
+                        traj['tdlamret'][inds], traj['ac'][inds],
                         traj['vpred'][inds], traj["ac_logits"][inds]
                     )
                     loss_vals.append([l.detach().numpy() for l in losses])
@@ -146,37 +162,24 @@ class MAMLWorker(object):
         self.env.sample()
 
         # then train model
-        loss_vals, ob, new = self._train()
+        train_params = self.config["train_params"]
+        loss_vals, ob, new = self._train(train_params["n_traj"], True)
         logger.debug("worker training finished")
 
-        # then collect data for metalerning
-        train_params = self.config["train_params"]
-        n_steps = train_params["meta_n_steps"]
-        traj = sample_trajectory(self.model, self.env, n_steps, True, ob, new)
-        add_vtarg_and_adv(traj, train_params['gamma'], train_params['lam'])
-
-        epinfobuf = self.epinfobuf
-        epinfobuf.extend(traj['ep_infos'])
-
-        # get gradients
-        n_batches = n_steps // train_params["batch_size"]
-        loss_vals = []
-        for i in range(n_batches):
-            start = i * train_params["batch_size"]
-            end = (i + 1) * train_params["batch_size"]
-            inds = slice(start, end)
-
-            losses = self.model.accumulate_grad(
-                train_params['cliprange'], traj['ob'][inds],
-                traj["adv"][inds], traj['tdlamret'][inds], traj['ac'][inds],
-                traj['vpred'][inds], traj["ac_logits"][inds]
-            )
-            loss_vals.append([l.detach().numpy() for l in losses])
+        # then collect accumulate gradients for metalearning
+        loss_vals, _, _ = self._train(train_params["n_traj2"], False, ob, new)
         logger.debug("worker gradients accumulation finished")
 
+        res = {
+            "game_name": self.env.unwrapped.gamename,
+            "state_name": self.env.unwrapped.statename,
+            "grads": self.model.get_grads()
+        }
+
         self.updates += 1
-        total_steps = self.updates * (n_steps + train_params["train_traj"] * train_params["n_steps"])
+        total_steps = self.updates * train_params["n_steps"] * (train_params["n_traj2"] + train_params["n_traj"])
         if self.updates % self.config["log"]["log_interval"] == 0 or self.updates == 1:
+            epinfobuf = self.epinfobuf
 
             tnow = time()
             fps = int(total_steps / (tnow - self.start_t))
@@ -192,12 +195,6 @@ class MAMLWorker(object):
             for loss_val, loss_name in zip(np.mean(loss_vals, axis=0), self.model.loss_names):
                 logger.logkv(loss_name, loss_val)
             logger.dumpkvs()
-
-        res = {
-            "game_name": self.env.unwrapped.gamename,
-            "state_name": self.env.unwrapped.statename,
-            "grads": self.model.get_grads()
-        }
 
         return pickle.dumps(res)
 
