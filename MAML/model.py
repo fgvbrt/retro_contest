@@ -53,7 +53,7 @@ class NatureCNN(nn.Module):
     def get_grads(self):
         return [p.grad for p in self.parameters() if p.grad is not None]
 
-    def add_grad(self, grads):
+    def add_grads(self, grads):
         # TODO: надо бы проверить, что верно проинициализировано
         i = 0
         for p in self.parameters():
@@ -94,7 +94,7 @@ class CNNPolicy(object):
         return self.model.get_grads()
 
     def add_grads(self, grads):
-        self.model.add_grad(grads)
+        self.model.add_grads(grads)
 
     def zero_grad(self):
         self.model.zero_grad()
