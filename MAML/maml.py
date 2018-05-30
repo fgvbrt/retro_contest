@@ -78,8 +78,7 @@ def run_maml(args):
     # start run
     workers_results = {w: Pyro4.Future(w.run)() for w in workers}
 
-    logdir = Path(config['log']['log_dir']) / args.exp_name
-    logdir.mkdir(parents=True, exist_ok=True)
+    savedir = utils.prepare_exp_dir(config, args.exp_name)
 
     updates = 0
     while True:
@@ -96,12 +95,12 @@ def run_maml(args):
 
         # save last weights
         if config['log']['save_last']:
-            fpath = logdir / 'params_last.pt'
+            fpath = savedir / 'last.pt'
             model.save(fpath)
 
         # save on save period
         if updates % config['log']["save_interval"] == 0 or updates == 1:
-            fpath = logdir / 'params_{}.pt'.format(updates)
+            fpath = savedir / '{}.pt'.format(updates)
             model.save(fpath)
 
 

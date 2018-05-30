@@ -97,8 +97,7 @@ def train(args):
     env_params = config['env_params']
     log_params = config["log"]
 
-    logdir = Path(log_params['log_dir']) / args.exp_name
-    logdir.mkdir(parents=True, exist_ok=True)
+    savedir = utils.prepare_exp_dir(config, args.exp_name)
 
     env = sonic_utils.make_from_config(env_params)
 
@@ -166,12 +165,12 @@ def train(args):
 
         # save last weights
         if log_params['save_last']:
-            fpath = logdir / 'params_last.pt'
+            fpath = savedir / 'last.pt'
             model.save(fpath)
 
         # save on save period
         if updates % log_params["save_interval"] == 0 or updates == 1:
-            fpath = logdir / 'params_{}.pt'.format(updates)
+            fpath = savedir / '{}.pt'.format(updates)
             model.save(fpath)
 
 

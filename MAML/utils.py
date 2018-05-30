@@ -1,13 +1,24 @@
 import base64
 import pickle
 from copy import deepcopy
-import os
 from datetime import datetime
 import argparse
+from pathlib import Path
+import yaml
 
 
-def make_dir(dir_name):
-    os.makedirs(dir_name, exist_ok=True)
+def prepare_exp_dir(config, exp_name):
+    # directory for logs
+    logdir = Path(config['log']['log_dir']) / exp_name
+    logdir.mkdir(parents=True, exist_ok=True)
+
+    with open(logdir / 'config.yaml') as f:
+        yaml.dump(config, f)
+
+    savedir = logdir / 'weights'
+    savedir.mkdir(parents=True, exist_ok=True)
+
+    return savedir
 
 
 def get_args():
