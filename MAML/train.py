@@ -91,7 +91,7 @@ def get_config(fnames):
 
 def train(args):
 
-    config = get_config(args)
+    config = get_config(args.config)
 
     train_params = config['train_params']
     env_params = config['env_params']
