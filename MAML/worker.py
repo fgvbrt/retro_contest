@@ -1,5 +1,5 @@
 import os
-os.environ['OMP_NUM_THREADS'] = '1'
+#os.environ['OMP_NUM_THREADS'] = '1'
 
 import numpy as np
 import Pyro4
@@ -14,7 +14,7 @@ from time import time
 from collections import deque
 import torch
 
-torch.set_num_threads(1)
+#torch.set_num_threads(1)
 logger.set_level(logger.DEBUG)
 
 
@@ -131,7 +131,7 @@ class MAMLWorker(object):
             ob = traj["last_ob"]
             new = traj["last_new"]
 
-            if not train:
+            if not train or True:
                 self.epinfobuf.extend(traj['ep_infos'])
 
             # run training
@@ -167,14 +167,14 @@ class MAMLWorker(object):
         logger.debug("worker training finished")
 
         # then collect accumulate gradients for metalearning
-        loss_vals, _, _ = self._train(train_params["n_traj2"], False, ob, new)
-        logger.debug("worker gradients accumulation finished")
+        #loss_vals, _, _ = self._train(train_params["n_traj2"], False, ob, new)
+        #logger.debug("worker gradients accumulation finished")
 
-        res = {
-            "game_name": self.env.unwrapped.gamename,
-            "state_name": self.env.unwrapped.statename,
-            "grads": self.model.get_grads()
-        }
+        #res = {
+        #    "game_name": self.env.unwrapped.gamename,
+        #    "state_name": self.env.unwrapped.statename,
+        #    "grads": self.model.get_grads()
+        #}
 
         self.updates += 1
         total_steps = self.updates * train_params["n_steps"] * (train_params["n_traj2"] + train_params["n_traj"])
@@ -196,7 +196,8 @@ class MAMLWorker(object):
                 logger.logkv(loss_name, loss_val)
             logger.dumpkvs()
 
-        return pickle.dumps(res)
+        return None
+        #return pickle.dumps(res)
 
 
 def main():

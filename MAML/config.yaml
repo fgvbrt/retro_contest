@@ -1,7 +1,7 @@
 train_params:
   max_steps: 100000000
   lr: 0.0002
-  lr_meta: 0.0002
+  lr_meta: 0.002
   vf_coef: 0.5
   ent_coef: 0.01
   cliprange: 0.1

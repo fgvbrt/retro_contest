@@ -48,11 +48,11 @@ def wait_run_end(workers_results, model, timeout=None):
         while not res.ready:
             sleep(1)
 
-        res = utils.unpickle(res.value)
-        grads = res["grads"]
-        model.add_grads(grads)
+        #res = utils.unpickle(res.value)
+        #grads = res["grads"]
+        #model.add_grads(grads)
 
-        new_res = Pyro4.Future(w.run)(weights)
+        new_res = Pyro4.Future(w.run)()
         workers_results[w] = new_res
 
 
@@ -79,13 +79,13 @@ def run_maml():
 
     while True:
         # first zero all grads
-        model.optimizer.zero_grad()
+        #model.optimizer.zero_grad()
 
         # then apply add grads from remote workers
         wait_run_end(workers_results, model)
 
         # apply gradient
-        model.optimizer.step()
+        #model.optimizer.step()
 
 
 if __name__ == '__main__':
