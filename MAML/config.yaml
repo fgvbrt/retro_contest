@@ -11,7 +11,7 @@ train_params:
   n_opt_epochs: 3
   batch_size: 4500
   max_grad_norm: 0.5
-  n_traj: 3
+  n_traj1: 3
   n_traj2: 3
   meta_algo: "reptile" # reptile or maml
 
