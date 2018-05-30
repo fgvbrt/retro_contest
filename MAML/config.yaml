@@ -13,6 +13,7 @@ train_params:
   max_grad_norm: 0.5
   n_traj: 3
   n_traj2: 3
+  meta_algo: "reptile" # reptile or maml
 
 env_params:
   exp_type: "x"

@@ -13,6 +13,7 @@ from baselines import logger
 from time import time
 from collections import deque
 import torch
+import pickle
 
 torch.set_num_threads(1)
 logger.set_level(logger.DEBUG)
@@ -131,7 +132,7 @@ class MAMLWorker(object):
             ob = traj["last_ob"]
             new = traj["last_new"]
 
-            if not train:
+            if not train or train_params["meta_algo"] == "reptile":
                 self.epinfobuf.extend(traj['ep_infos'])
 
             # run training
@@ -158,6 +159,11 @@ class MAMLWorker(object):
         if weights is not None:
             self.set_model_weights(weights)
 
+        # copy initial weights
+        # TODO: optimize with copy remove ugly weights receiving
+        weights = pickle.dumps([p for p in self.model.model.parameters() if p.grad is not None])
+        weights = pickle.loads(weights)
+
         # first sample environment
         self.env.sample()
 
@@ -166,18 +172,28 @@ class MAMLWorker(object):
         loss_vals, ob, new = self._train(train_params["n_traj"], True)
         logger.debug("worker training finished")
 
-        # then collect accumulate gradients for metalearning
-        loss_vals, _, _ = self._train(train_params["n_traj2"], False, ob, new)
-        logger.debug("worker gradients accumulation finished")
+        # collect samples for gradient only for meta learning algo
+        k = 0
+        if train_params["meta_algo"] == "maml":
+            # then collect accumulate gradients for metalearning
+            loss_vals, _, _ = self._train(train_params["n_traj2"], False, ob, new)
+            logger.debug("worker gradients accumulation finished")
+            meta_grads = self.model.get_grads()
+        elif train_params["meta_algo"] == "reptile":
+            k = 1
+            cur_weights = [p for p in self.model.model.parameters() if p.grad is not None]
+            meta_grads = [w_old - w_new for w_old, w_new in zip(weights, cur_weights)]
+        else:
+            raise ValueError("unknown meta algo {}".format(train_params["meta_algo"]))
 
         res = {
             "game_name": self.env.unwrapped.gamename,
             "state_name": self.env.unwrapped.statename,
-            "grads": self.model.get_grads()
+            "grads": meta_grads
         }
 
         self.updates += 1
-        total_steps = self.updates * train_params["n_steps"] * (train_params["n_traj2"] + train_params["n_traj"])
+        total_steps = self.updates * train_params["n_steps"] * (train_params["n_traj2"] * k + train_params["n_traj"])
         if self.updates % self.config["log"]["log_interval"] == 0 or self.updates == 1:
             epinfobuf = self.epinfobuf
 
