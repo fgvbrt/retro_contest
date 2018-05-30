@@ -7,7 +7,6 @@ import sonic_utils
 from model import CNNPolicy
 from train import add_vtarg
 import argparse
-import pickle
 import utils
 from baselines import logger
 from time import time
@@ -20,7 +19,6 @@ logger.set_level(logger.DEBUG)
 
 
 def sample_trajectory(model, env, horizon, sample, ob=None, new=False):
-    t = 0
     ac = env.action_space.sample()  # not used, just so we have the datatype
 
     if ob is None:
@@ -58,8 +56,6 @@ def sample_trajectory(model, env, horizon, sample, ob=None, new=False):
 
             ob = env.reset()
 
-        t += 1
-
     return {
         "ob": obs, "rew": rews,
         "vpred": vpreds, "new": news,
@@ -82,7 +78,7 @@ class MAMLWorker(object):
         self.start_t = None
         self.epinfobuf = deque(maxlen=100)
 
-    def initialize(self, config, weights):
+    def initialize(self, config, weights=None):
         self.config = config
         train_params = config['train_params']
         env_params = config['env_params']
@@ -97,7 +93,9 @@ class MAMLWorker(object):
             train_params["ent_coef"], train_params["lr"], train_params["max_grad_norm"]
         )
 
-        self.set_model_weights(weights)
+        if weights is not None:
+            self.set_model_weights(weights)
+
         self.start_t = time()
         logger.debug("worker initialized")
 
@@ -110,15 +108,17 @@ class MAMLWorker(object):
     def initialized(self):
         return self.model is not None and self.env is not None and self.config is not None
 
-    def _train(self, n_traj, train=True, ob=None, new=True):
+    def _train(self, train=True, ob=None, new=True):
         train_params = self.config['train_params']
 
         if train:
             train_fn = self.model.train
             n_opt_epochs = train_params["n_opt_epochs"]
+            n_traj = train_params['n_traj1']
         else:
             train_fn = self.model.accumulate_grad
             n_opt_epochs = 1
+            n_traj = train_params['n_traj2']
 
         seg_inds = np.arange(train_params['n_steps'])
         n_batches = train_params["n_steps"] // train_params["batch_size"]
@@ -169,14 +169,14 @@ class MAMLWorker(object):
 
         # then train model
         train_params = self.config["train_params"]
-        loss_vals, ob, new = self._train(train_params["n_traj"], True)
+        loss_vals, ob, new = self._train(True)
         logger.debug("worker training finished")
 
         # collect samples for gradient only for meta learning algo
         k = 0
         if train_params["meta_algo"] == "maml":
             # then collect accumulate gradients for metalearning
-            loss_vals, _, _ = self._train(train_params["n_traj2"], False, ob, new)
+            loss_vals, _, _ = self._train(False, ob, new)
             logger.debug("worker gradients accumulation finished")
             meta_grads = self.model.get_grads()
         elif train_params["meta_algo"] == "reptile":
@@ -224,21 +224,34 @@ def main():
         parser.add_argument('--nathost', type=str, default=None, help="Nat name.")
         parser.add_argument('--natport', type=int, default=None, help="Nat port.")
         parser.add_argument('--ns_host', type=str, default='94.45.222.176', help="Name server host.")
+        utils.add_boolean_flag(parser, "debug", default=False)
         return parser.parse_args()
 
     args = _get_args()
     worker = MAMLWorker()
 
-    # for example purposes we will access the daemon and name server ourselves and not use serveSimple
-    with Pyro4.Daemon(host=args.host, port=args.port, nathost=args.nathost, natport=args.natport) as daemon:
-        uri = daemon.register(worker)
-        name = "worker.{}.port.{}".format(args.name, args.port)
+    if args.debug:
+        config = utils.load_config(['config.yaml', 'config_debug.yaml'])
+        worker.initialize(config)
+        total_steps = 0
 
-        with Pyro4.locateNS(host=args.ns_host) as ns:
-            ns.register(name, uri)
+        while True:
+            if total_steps > config["train_params"]['max_steps']:
+                break
 
-        print("Sampler ready: name {} uri {}".format(name, uri))
-        daemon.requestLoop()
+            worker.run()
+            total_steps += 1
+    else:
+        # for example purposes we will access the daemon and name server ourselves and not use serveSimple
+        with Pyro4.Daemon(host=args.host, port=args.port, nathost=args.nathost, natport=args.natport) as daemon:
+            uri = daemon.register(worker)
+            name = "worker.{}.port.{}".format(args.name, args.port)
+
+            with Pyro4.locateNS(host=args.ns_host) as ns:
+                ns.register(name, uri)
+
+            print("Sampler ready: name {} uri {}".format(name, uri))
+            daemon.requestLoop()
 
 
 if __name__ == '__main__':

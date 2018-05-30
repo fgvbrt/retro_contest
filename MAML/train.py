@@ -1,12 +1,10 @@
 import sonic_utils
 import utils
-import yaml
 from model import CNNPolicy
 import numpy as np
 from time import time
 from baselines import logger
 from collections import deque
-from pathlib import Path
 
 
 def traj_segment_generator(model, env, horizon, sample):
@@ -79,19 +77,9 @@ def add_vtarg(seg, gamma, lam):
     seg["tdlamret"] = gaelam + seg["vpred"]
 
 
-def get_config(fnames):
-
-    config = {}
-    for fname in fnames:
-        with open(fname) as f:
-            config = utils.merge_dictionaries(config, yaml.load(f))
-
-    return config
-
-
 def train(args):
 
-    config = get_config(args.config)
+    config = utils.load_config(args.config)
 
     train_params = config['train_params']
     env_params = config['env_params']

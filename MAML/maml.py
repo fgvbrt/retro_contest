@@ -58,7 +58,7 @@ def wait_run_end(workers_results, model, timeout=None):
 
 
 def run_maml(args):
-    config = train.get_config(args.config)
+    config = utils.load_config(args.config)
     train_params = config["train_params"]
 
     # open and close env just to get right action and obs space
