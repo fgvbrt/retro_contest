@@ -172,17 +172,17 @@ class MAMLWorker(object):
         loss_vals, ob, new = self._train(True)
         logger.debug("worker training finished")
 
-        k = 0
+        steps = train_params["n_steps"] * train_params["n_traj1"]
         res = {}
         if not debug:
             # collect samples for gradient only for meta learning algo
             if train_params["meta_algo"] == "maml":
+                steps += train_params["n_steps"] * train_params["n_traj2"]
                 self.model.optimizer.zero_grad()
                 loss_vals, _, _ = self._train(False, ob, new)
                 logger.debug("worker gradients accumulation finished")
                 meta_grads = self.model.get_grads()
             elif train_params["meta_algo"] == "reptile":
-                k = 1
                 cur_weights = [p for p in self.model.model.parameters() if p.grad is not None]
                 meta_grads = [w_old - w_new for w_old, w_new in zip(weights, cur_weights)]
             else:
@@ -195,7 +195,7 @@ class MAMLWorker(object):
             }
 
         self.updates += 1
-        total_steps = self.updates * train_params["n_steps"] * (train_params["n_traj2"] * k + train_params["n_traj1"])
+        total_steps = self.updates * steps
         if self.updates % self.config["log"]["log_interval"] == 0 or self.updates == 1:
             epinfobuf = self.epinfobuf
 
