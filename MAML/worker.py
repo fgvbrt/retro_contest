@@ -152,7 +152,7 @@ class MAMLWorker(object):
 
         return loss_vals, ob, new
 
-    def run(self, weights=None):
+    def run(self, weights=None, debug=False):
         logger.debug("start worker run")
 
         # set model params
@@ -172,25 +172,27 @@ class MAMLWorker(object):
         loss_vals, ob, new = self._train(True)
         logger.debug("worker training finished")
 
-        # collect samples for gradient only for meta learning algo
         k = 0
-        if train_params["meta_algo"] == "maml":
-            # then collect accumulate gradients for metalearning
-            loss_vals, _, _ = self._train(False, ob, new)
-            logger.debug("worker gradients accumulation finished")
-            meta_grads = self.model.get_grads()
-        elif train_params["meta_algo"] == "reptile":
-            k = 1
-            cur_weights = [p for p in self.model.model.parameters() if p.grad is not None]
-            meta_grads = [w_old - w_new for w_old, w_new in zip(weights, cur_weights)]
-        else:
-            raise ValueError("unknown meta algo {}".format(train_params["meta_algo"]))
+        res = {}
+        if not debug:
+            # collect samples for gradient only for meta learning algo
+            if train_params["meta_algo"] == "maml":
+                self.optimizer.zero_grad()
+                loss_vals, _, _ = self._train(False, ob, new)
+                logger.debug("worker gradients accumulation finished")
+                meta_grads = self.model.get_grads()
+            elif train_params["meta_algo"] == "reptile":
+                k = 1
+                cur_weights = [p for p in self.model.model.parameters() if p.grad is not None]
+                meta_grads = [w_old - w_new for w_old, w_new in zip(weights, cur_weights)]
+            else:
+                raise ValueError("unknown meta algo {}".format(train_params["meta_algo"]))
 
-        res = {
-            "game_name": self.env.unwrapped.gamename,
-            "state_name": self.env.unwrapped.statename,
-            "grads": meta_grads
-        }
+            res = {
+                "game_name": self.env.unwrapped.gamename,
+                "state_name": self.env.unwrapped.statename,
+                "grads": meta_grads
+            }
 
         self.updates += 1
         total_steps = self.updates * train_params["n_steps"] * (train_params["n_traj2"] * k + train_params["n_traj"])
@@ -239,7 +241,7 @@ def main():
             if total_steps > config["train_params"]['max_steps']:
                 break
 
-            worker.run()
+            worker.run(debug=True)
             total_steps += 1
     else:
         # for example purposes we will access the daemon and name server ourselves and not use serveSimple
