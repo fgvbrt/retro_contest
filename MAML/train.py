@@ -1,12 +1,12 @@
 import sonic_utils
 import utils
 import yaml
-import argparse
 from model import CNNPolicy
 import numpy as np
 from time import time
 from baselines import logger
 from collections import deque
+from pathlib import Path
 
 
 def traj_segment_generator(model, env, horizon, sample):
@@ -79,31 +79,26 @@ def add_vtarg(seg, gamma, lam):
     seg["tdlamret"] = gaelam + seg["vpred"]
 
 
-def get_config(args=None):
-    def _parse_args():
-        parser = argparse.ArgumentParser(description="Run commands")
-        parser.add_argument(
-            '--config', type=str, default=None, nargs='+',
-            help="Yaml files with configs")
-        return parser.parse_args()
-
-    if args is None:
-        args = _parse_args()
+def get_config(fnames):
 
     config = {}
-    for fname in args.config:
+    for fname in fnames:
         with open(fname) as f:
             config = utils.merge_dictionaries(config, yaml.load(f))
 
     return config
 
 
-def train(args=None):
+def train(args):
+
     config = get_config(args)
 
     train_params = config['train_params']
     env_params = config['env_params']
     log_params = config["log"]
+
+    logdir = Path(log_params['log_dir']) / args.exp_name
+    logdir.mkdir(parents=True, exist_ok=True)
 
     env = sonic_utils.make_from_config(env_params)
 
@@ -169,6 +164,17 @@ def train(args=None):
 
             del loss_vals[:]
 
+        # save last weights
+        if log_params['save_last']:
+            fpath = logdir / 'params_last.pt'
+            model.save(fpath)
+
+        # save on save period
+        if updates % log_params["save_interval"] == 0 or updates == 1:
+            fpath = logdir / 'params_{}.pt'.format(updates)
+            model.save(fpath)
+
 
 if __name__ == '__main__':
-    train()
+    args = utils.get_args()
+    train(args)

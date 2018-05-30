@@ -107,10 +107,17 @@ class CNNPolicy(object):
         return self.model.load_state_dict(weights)
 
     def save(self, fname):
-        raise NotImplementedError()
+        state_dict = {
+            "model": self.model.state_dict(),
+            "opt": self.optimizer.state_dict(),
+        }
+        torch.save(state_dict, str(fname))
 
-    def load(self, fname):
-        raise NotImplementedError()
+    def load(self, fname, restore_opt=False):
+        state_dict = torch.load(str(fname))
+        self.model.load_state_dict(state_dict["model"])
+        if restore_opt:
+            self.optimizer.load_state_dict(state_dict["opt"])
 
     def step(self, obs, sample=True):
         # make batch of one

@@ -1,6 +1,25 @@
 import base64
 import pickle
-from copy import  deepcopy
+from copy import deepcopy
+import os
+from datetime import datetime
+import argparse
+
+
+def make_dir(dir_name):
+    os.makedirs(dir_name, exist_ok=True)
+
+
+def get_args():
+    parser = argparse.ArgumentParser(description="Run commands")
+    parser.add_argument(
+        '--config', type=str, default=None, nargs='+',
+        help="Yaml files with configs")
+    parser.add_argument(
+        '--exp_name', type=str,
+        default=datetime.now().strftime("%d.%m.%Y-%H:%M"),
+        help='Experiment name')
+    return parser.parse_args()
 
 
 def merge_dictionaries(a, b, path_to_root=None, extend_lists=False):

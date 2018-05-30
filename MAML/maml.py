@@ -9,6 +9,7 @@ from model import CNNPolicy
 import utils
 from time import sleep
 import torch
+from pathlib import Path
 torch.set_num_threads(1)
 
 
@@ -56,8 +57,8 @@ def wait_run_end(workers_results, model, timeout=None):
         workers_results[w] = new_res
 
 
-def run_maml():
-    config = train.get_config()
+def run_maml(args):
+    config = train.get_config(args)
     train_params = config["train_params"]
 
     # open and close env just to get right action and obs space
@@ -77,6 +78,10 @@ def run_maml():
     # start run
     workers_results = {w: Pyro4.Future(w.run)() for w in workers}
 
+    logdir = Path(config['log']['log_dir']) / args.exp_name
+    logdir.mkdir(parents=True, exist_ok=True)
+
+    updates = 0
     while True:
         # first zero all grads
         model.optimizer.zero_grad()
@@ -87,10 +92,23 @@ def run_maml():
         # apply gradient
         model.optimizer.step()
 
+        updates += 1
+
+        # save last weights
+        if config['log']['save_last']:
+            fpath = logdir / 'params_last.pt'
+            model.save(fpath)
+
+        # save on save period
+        if updates % config['log']["save_interval"] == 0 or updates == 1:
+            fpath = logdir / 'params_{}.pt'.format(updates)
+            model.save(fpath)
+
 
 if __name__ == '__main__':
     try:
-        run_maml()
+        args = utils.get_args()
+        run_maml(args)
     except:
         print("Pyro traceback:")
         print("".join(Pyro4.util.getPyroTraceback()))
