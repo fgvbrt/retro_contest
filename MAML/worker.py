@@ -177,7 +177,7 @@ class MAMLWorker(object):
         if not debug:
             # collect samples for gradient only for meta learning algo
             if train_params["meta_algo"] == "maml":
-                self.optimizer.zero_grad()
+                self.model.optimizer.zero_grad()
                 loss_vals, _, _ = self._train(False, ob, new)
                 logger.debug("worker gradients accumulation finished")
                 meta_grads = self.model.get_grads()
