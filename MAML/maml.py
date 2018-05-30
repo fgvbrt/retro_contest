@@ -94,3 +94,4 @@ if __name__ == '__main__':
     except:
         print("Pyro traceback:")
         print("".join(Pyro4.util.getPyroTraceback()))
+        raise
