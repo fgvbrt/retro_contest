@@ -195,7 +195,7 @@ class MAMLWorker(object):
             }
 
         self.updates += 1
-        total_steps = self.updates * train_params["n_steps"] * (train_params["n_traj2"] * k + train_params["n_traj"])
+        total_steps = self.updates * train_params["n_steps"] * (train_params["n_traj2"] * k + train_params["n_traj1"])
         if self.updates % self.config["log"]["log_interval"] == 0 or self.updates == 1:
             epinfobuf = self.epinfobuf
 
