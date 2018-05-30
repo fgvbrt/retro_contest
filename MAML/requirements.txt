@@ -10,3 +10,4 @@ pandas
 Pyro4
 gym-retro
 torchvision
+pyyaml
