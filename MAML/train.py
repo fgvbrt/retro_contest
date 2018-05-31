@@ -5,6 +5,7 @@ import numpy as np
 from time import time
 from baselines import logger
 from collections import deque
+import pandas as pd
 
 
 def traj_segment_generator(model, env, horizon, sample):
@@ -37,7 +38,7 @@ def traj_segment_generator(model, env, horizon, sample):
             }
             # Be careful!!! if you change the downstream algorithm to aggregate
             # several of these batches, then be sure to do a deepcopy
-            del ep_infos[:]
+            ep_infos = []
 
         i = t % horizon
         obs[i] = ob
@@ -77,15 +78,14 @@ def add_vtarg(seg, gamma, lam):
     seg["tdlamret"] = gaelam + seg["vpred"]
 
 
-def train(args):
-
-    config = utils.load_config(args.config)
+def train(config, exp_name='test', weights=None, save=False):
 
     train_params = config['train_params']
     env_params = config['env_params']
     log_params = config["log"]
 
-    savedir = utils.prepare_exp_dir(config, args.exp_name)
+    if save:
+        savedir = utils.prepare_exp_dir(config, exp_name)
 
     env = sonic_utils.make_from_config(env_params)
 
@@ -94,13 +94,16 @@ def train(args):
         train_params["ent_coef"], train_params["lr"], train_params["max_grad_norm"]
     )
 
+    if weights is not None:
+        model.load(weights)
+
     seg_gen = traj_segment_generator(
         model, env, train_params['n_steps'], sample=True)
 
     total_steps = 0
     updates = 0
     t0 = time()
-    epinfobuf = deque(maxlen=100)
+    epinfobuf = deque(maxlen=100 if save else None)
     seg_inds = np.arange(train_params['n_steps'])
     n_batches = train_params["n_steps"] // train_params["batch_size"]
     loss_vals = []
@@ -132,7 +135,7 @@ def train(args):
         total_steps += train_params['n_steps']
         updates += 1
 
-        if updates % log_params["log_interval"] == 0 or updates == 1:
+        if updates % log_params["log_interval"] == 0 or updates == 1 and save:
 
             tnow = time()
             fps = int(total_steps / (tnow - t0))
@@ -152,16 +155,40 @@ def train(args):
             del loss_vals[:]
 
         # save last weights
-        if log_params['save_last']:
+        if log_params['save_last'] and save:
             fpath = savedir / 'last.pt'
             model.save(fpath)
 
         # save on save period
-        if updates % log_params["save_interval"] == 0 or updates == 1:
+        if (updates % log_params["save_interval"] == 0 or updates == 1) and save:
             fpath = savedir / '{}.pt'.format(updates)
             model.save(fpath)
 
+    return epinfobuf
+
+
+def test():
+    args = utils.get_args()
+
+    config = utils.load_config(args.config)
+
+    # TODO: hardcode for testing
+    test_params = config["test_params"]
+    config['train_params']["max_steps"] = test_params["test_steps"]
+    config['env_params']["max_episode_steps"] = test_params["max_episode_steps"]
+    game_states = pd.read_csv(test_params["game_states"]).values.tolist()
+
+    all_means = []
+    for game, state in game_states:
+        config['env_params']["game_states"] = [(game, state)]
+        epinfobuf = train(config, args.exp_name, test_params["weights"], False)
+
+        rewards = [epinfo['r'] for epinfo in epinfobuf if 'r' in epinfo]
+        print("{} {} {:.2f} {:.2f}".format(game, state, np.max(rewards), np.mean(rewards)))
+        all_means.append(np.mean(rewards))
+
+    print("final result {:.2f}".format(np.mean(all_means)))
+
 
 if __name__ == '__main__':
-    args = utils.get_args()
-    train(args)
+    test()

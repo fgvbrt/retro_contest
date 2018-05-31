@@ -1,0 +1,9 @@
+test_params:
+  game_states: "validation.csv"
+  max_episode_steps: 4500
+  test_steps: 500000
+  weights: "/home/misha/projects/retro/MAML/logs/31.05.2018-02:38/weights/last.pt"
+
+
+log:
+  log_interval: 100000

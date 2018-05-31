@@ -21,8 +21,14 @@ def make_from_config(config, maml=False):
     # local training
     config = deepcopy(config)
     if "game_states" in config:
-        game_states = pd.read_csv(config["game_states"]).values.tolist()
-        config["game_states"] = game_states
+
+        # file
+        if isinstance(config["game_states"], str):
+            game_states = pd.read_csv(config["game_states"]).values.tolist()
+            config["game_states"] = game_states
+
+        assert isinstance(config["game_states"], list)
+
         if maml:
             env = make_maml_env(**config)
         else:
