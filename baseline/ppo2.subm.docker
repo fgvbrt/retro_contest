@@ -8,7 +8,7 @@ RUN apt-get update && \
 # Baselines has some unneeded and cumbersome dependencies,
 # so we manually fetch the deps we need.
 RUN . ~/venv/bin/activate && \
-    pip install scipy tqdm joblib zmq dill progressbar2 cloudpickle opencv-python pandas && \
+    pip install scipy tqdm joblib zmq dill progressbar2 cloudpickle opencv-python pandas pyyaml && \
     pip install --no-deps git+https://github.com/fgvbrt/baselines.git@1659068fdeb5fd4859fa598634008a84afe3616e && \
     pip install gym-retro && \
     git clone https://github.com/openai/retro-contest.git && cd retro-contest/support && \
@@ -16,7 +16,9 @@ RUN . ~/venv/bin/activate && \
 
 ADD sonic_util.py ./
 ADD ppo2_agent.py ./
+ADD utils.py ./
 ADD test.sh ./
+ADD *.yaml ./
 ADD *.pkl ./
 
 CMD ["/bin/bash", "test.sh"]

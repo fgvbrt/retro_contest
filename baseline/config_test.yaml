@@ -1,0 +1,5 @@
+train_params:
+  weights_path: "weights.pkl"
+
+env_params:
+  socket_dir: "tmp/sock"

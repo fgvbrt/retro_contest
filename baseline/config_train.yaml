@@ -1,0 +1,3 @@
+env_params:
+  game_states: "all.csv"
+  max_episode_steps: 4500

@@ -1,19 +1,42 @@
 """
 Environments and wrappers for Sonic training.
 """
-
 import gym
 import numpy as np
-
-from baselines.common.atari_wrappers import FrameStack
-import gym_remote.client as grc
-import retro
-import retro_contest
+import pandas as pd
 import random
 from collections import defaultdict
 from gym import spaces
 import cv2
+import retro
+import gym_remote.client as grc
+import retro_contest
+from baselines.common.atari_wrappers import FrameStack
+from copy import deepcopy
 cv2.ocl.setUseOpenCL(False)
+
+
+def make_from_config(config, maml=False):
+    # local training
+    config = deepcopy(config)
+    if "game_states" in config:
+
+        # file
+        if isinstance(config["game_states"], str):
+            game_states = pd.read_csv(config["game_states"]).values.tolist()
+            config["game_states"] = game_states
+
+        assert isinstance(config["game_states"], list)
+
+        env = make_rand_env(maml=maml, **config)
+
+    # remote testing
+    elif "socket_dir" in config:
+        env = make_remote_env(**config)
+    else:
+        raise ValueError("provide game_states or socket dir")
+
+    return env
 
 
 def make(game, state, discrete_actions=False, bk2dir=None):
@@ -30,7 +53,8 @@ def make(game, state, discrete_actions=False, bk2dir=None):
     return env
 
 
-def make_remote_env(stack=True, scale_rew=True, gray=True,  exp_type='obs', exp_const=0.002, socket_dir='/tmp'):
+def make_remote_env(stack=2, scale_rew=True, color=False,  exp_type='obs', exp_const=0.002,
+                    socket_dir='/tmp'):
     """
     Create an environment with some standard wrappers.
     """
@@ -42,7 +66,7 @@ def make_remote_env(stack=True, scale_rew=True, gray=True,  exp_type='obs', exp_
     if scale_rew:
         env = RewardScaler(env)
 
-    env = WarpFrame(env, gray)
+    env = WarpFrame(env, color)
 
     if exp_const > 0:
         if exp_type == 'obs':
@@ -50,26 +74,31 @@ def make_remote_env(stack=True, scale_rew=True, gray=True,  exp_type='obs', exp_
         elif exp_type == 'x':
             env = XExplorationReward(env, exp_const, game_specific=False)
 
-    if stack:
-        env = FrameStack(env, 2)
+    if stack > 1:
+        env = FrameStack(env, stack)
 
     env = EpisodeInfo(env)
 
     return env
 
 
-def make_rand_env(game_states, stack=True, scale_rew=True, gray=True, exp_type='x', exp_const=0.002):
+def make_rand_env(game_states, stack=2, scale_rew=True, color=False, exp_type='x',
+                  exp_const=0.002, max_episode_steps=4500, maml=False):
     """
     Create an environment with some standard wrappers.
     """
     game, state = game_states[0]
     env = make(game, state)
 
-    env = RandomEnvironmen(env, game_states)
-    env = retro_contest.StochasticFrameSkip(env, n=4, stickprob=0.25)
+    if maml:
+        env_rand = RandomEnvironmen2(env, game_states)
+    else:
+        env_rand = RandomEnvironmen(env, game_states)
+
+    env = retro_contest.StochasticFrameSkip(env_rand, n=4, stickprob=0.25)
 
     env = BackupOriginalData(env)
-    env = gym.wrappers.TimeLimit(env, max_episode_steps=4500)
+    env = gym.wrappers.TimeLimit(env, max_episode_steps=max_episode_steps)
 
     env = SonicDiscretizer(env)
     env = AllowBacktracking(env)
@@ -77,7 +106,7 @@ def make_rand_env(game_states, stack=True, scale_rew=True, gray=True, exp_type='
     if scale_rew:
         env = RewardScaler(env)
 
-    env = WarpFrame(env, gray)
+    env = WarpFrame(env, color)
 
     if exp_const > 0:
         if exp_type == 'obs':
@@ -85,10 +114,13 @@ def make_rand_env(game_states, stack=True, scale_rew=True, gray=True, exp_type='
         elif exp_type == 'x':
             env = XExplorationReward(env, exp_const, game_specific=True)
 
-    if stack:
-        env = FrameStack(env, 2)
+    if stack > 1:
+        env = FrameStack(env, stack)
 
     env = EpisodeInfo(env)
+
+    if maml:
+        env.sample = env_rand.sample
 
     return env
 
@@ -111,7 +143,7 @@ class SonicDiscretizer(gym.ActionWrapper):
             self._actions.append(arr)
         self.action_space = gym.spaces.Discrete(len(self._actions))
 
-    def action(self, a): # pylint: disable=W0221
+    def action(self, a):
         return self._actions[a].copy()
 
 
@@ -162,12 +194,12 @@ class AllowBacktracking(gym.Wrapper):
         self._cur_x = 0
         self._max_x = 0
 
-    def reset(self, **kwargs): # pylint: disable=E0202
+    def reset(self, **kwargs):
         self._cur_x = 0
         self._max_x = 0
         return self.env.reset(**kwargs)
 
-    def step(self, action): # pylint: disable=E0202
+    def step(self, action):
         obs, rew, done, info = self.env.step(action)
         self._cur_x += rew
         rew = max(0, self._cur_x - self._max_x)
@@ -222,6 +254,27 @@ class RandomEnvironmen(gym.Wrapper):
         self.env.close()
         game, state = random.choice(self.game_states)
         self.env = make(game, state)
+        return self.env.reset(**kwargs)
+
+
+class RandomEnvironmen2(gym.Wrapper):
+    """
+    Randomly choose level and state after reset is called.
+    Warning: this environment should be the first env Wrapper!
+    """
+    def __init__(self, env, game_states):
+        super(RandomEnvironmen2, self).__init__(env)
+        self.game_states = game_states
+
+    def sample(self):
+        game, state = random.choice(self.game_states)
+        self.env.close()
+        self.env = make(game, state)
+
+    def step(self, action):
+        return self.env.step(action)
+
+    def reset(self, **kwargs):
         return self.env.reset(**kwargs)
 
 
@@ -367,18 +420,18 @@ class ObsExplorationReward(gym.Wrapper):
 
 
 class WarpFrame(gym.ObservationWrapper):
-    def __init__(self, env, gray=True):
+    def __init__(self, env, color=False):
         """Warp frames to 84x84 as done in the Nature paper and later work."""
         gym.ObservationWrapper.__init__(self, env)
         self.width = 84
         self.height = 84
-        self.gray = gray
-        n_ch = 1 if gray else 3
+        self.color = color
+        n_ch = 3 if color else 1
         self.observation_space = spaces.Box(
             low=0, high=255, shape=(self.height, self.width, n_ch), dtype=np.uint8)
 
     def observation(self, frame):
-        if self.gray:
+        if not self.color:
             frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
         frame = cv2.resize(frame, (self.width, self.height), interpolation=cv2.INTER_AREA).\
             reshape(self.height, self.width, -1)
