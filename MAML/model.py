@@ -7,11 +7,6 @@ import utils
 import numpy as np
 
 
-def init_weights(m):
-    if isinstance(m, ) == nn.Linear:
-        m.weight.data.fill_(1.0)
-        print(m.weight)
-
 
 class NatureCNN(nn.Module):
     def __init__(self, n_ac, ob_space):
@@ -84,7 +79,7 @@ class CNNPolicy(object):
         self.ent_coef = ent_coef
         self.max_grad_norm = max_grad_norm
         self.loss_names = ("pg_loss", "entropy", "vf_loss", "clipfrac", "approxkl")
-
+        self.init_lr = lr
         self.optimizer = optim.Adam(self.model.parameters(), lr)
 
     def value(self, obs):
@@ -113,11 +108,29 @@ class CNNPolicy(object):
         }
         torch.save(state_dict, str(fname))
 
-    def load(self, fname, restore_opt=False):
+    def load(self, fname, restore_opt=None):
         state_dict = torch.load(str(fname))
         self.model.load_state_dict(state_dict["model"])
-        if restore_opt:
+
+        if restore_opt == "all":
             self.optimizer.load_state_dict(state_dict["opt"])
+        elif restore_opt == "weight_stats":
+            for gr in state_dict['opt']["param_groups"]:
+                # first learning rate
+                if 'lr' in gr:
+                    gr['lr'] = self.init_lr
+
+                # then zero step and leave only weight stats
+                for p in gr["params"]:
+                    state = state_dict['opt']['state']
+                    if p in state and 'step' in state[p]:
+                        state[p]['step'] = 0
+
+            self.optimizer.load_state_dict(state_dict["opt"])
+        elif restore_opt is None or restore_opt is False:
+            pass
+        else:
+            raise ValueError('unknown option for restore opt'.format(restore_opt))
 
     def step(self, obs, sample=True):
         # make batch of one

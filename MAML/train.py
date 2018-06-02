@@ -96,7 +96,7 @@ def train(config, exp_name='test'):
     )
 
     if train_params["weights"] is not None:
-        model.load(train_params["weights"])
+        model.load(train_params["weights"], train_params["load_adam_params"])
 
     seg_gen = traj_segment_generator(
         model, env, train_params['n_steps'], sample=True)
