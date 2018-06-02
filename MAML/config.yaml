@@ -25,6 +25,7 @@ env_params:
   scale_rew: True
 
 log:
+  log: True
   log_interval: 1
   save_interval: 10
   log_dir: logs
