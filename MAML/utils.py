@@ -40,7 +40,7 @@ def prepare_exp_dir(config, exp_name):
     logdir = Path(config['log']['log_dir']) / exp_name
     logdir.mkdir(parents=True, exist_ok=True)
 
-    with open(str(logdir / 'config.yaml'), 'w') as f:
+    with open(str(logdir / 'run_config.yaml'), 'w') as f:
         yaml.dump(config, f)
 
     savedir = logdir / 'weights'

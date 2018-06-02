@@ -35,7 +35,7 @@ def make_from_config(config, maml=False):
             env = make_rand_env(**config)
     # remote testing
     elif "socket_dir" in config:
-        env = config.make_remote_env(**config)
+        env = make_remote_env(**config)
     else:
         raise ValueError("provide game_states or socket dir")
 
@@ -56,7 +56,8 @@ def make(game, state, discrete_actions=False, bk2dir=None):
     return env
 
 
-def make_remote_env(stack=2, scale_rew=True, color=False,  exp_type='obs', exp_const=0.002, socket_dir='/tmp'):
+def make_remote_env(stack=2, scale_rew=True, color=False,  exp_type='obs', exp_const=0.002,
+                    socket_dir='/tmp'):
     """
     Create an environment with some standard wrappers.
     """

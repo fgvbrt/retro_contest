@@ -1,3 +1,6 @@
+train_params:
+  ep_info_len: 100
+
 env_params:
   game_states: "train_large.csv"
   max_episode_steps: 4500

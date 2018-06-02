@@ -1,0 +1,11 @@
+train_params:
+  max_steps: 500000
+  weights: "last.pt"
+
+env_params:
+  game_states: "validation.csv"
+  max_episode_steps: 4500
+
+log:
+  log: False
+  log_dir: null

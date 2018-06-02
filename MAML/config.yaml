@@ -14,6 +14,8 @@ train_params:
   n_traj1: 3
   n_traj2: 3
   meta_algo: "maml" # reptile or maml
+  weights: "last.pt"
+  ep_info_len: null
 
 env_params:
   exp_type: "x"
