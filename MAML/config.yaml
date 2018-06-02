@@ -15,7 +15,7 @@ train_params:
   n_traj2: 3
   meta_algo: "maml" # reptile or maml
   weights: "last.pt"
-  load_adam_params: "weight_stats"
+  load_adam_params: "all"
   ep_info_len: null
 
 env_params:

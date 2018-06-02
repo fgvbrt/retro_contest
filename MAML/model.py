@@ -113,6 +113,10 @@ class CNNPolicy(object):
         self.model.load_state_dict(state_dict["model"])
 
         if restore_opt == "all":
+            # keep learning rate
+            for gr in state_dict['opt']["param_groups"]:
+                if 'lr' in gr:
+                    gr['lr'] = self.init_lr
             self.optimizer.load_state_dict(state_dict["opt"])
         elif restore_opt == "weight_stats":
             for gr in state_dict['opt']["param_groups"]:
