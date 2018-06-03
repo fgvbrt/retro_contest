@@ -18,6 +18,7 @@ from baselines.ppo2.policies import LstmPolicy, CnnPolicy
 import utils
 import os
 import yaml
+import warnings
 
 
 def add_boolean_flag(parser, name, default=False, help=None):
@@ -54,14 +55,17 @@ def main(policy, env, params):
                    noptepochs=params["n_opt_epochs"],
                    log_interval=params["log_interval"],
                    ent_coef=params["ent_coef"],
+                   vf_coef=params['vf_coef'],
                    lr=lambda _: params["lr"],
                    cliprange=lambda _: params['cliprange'],
+                   max_grad_norm=params['max_grad_norm'],
                    total_timesteps=params["max_steps"],
                    save_interval=params["save_interval"],
                    weights_path=params["weights_path"],
                    adam_stats=params["adam_stats"],
                    nmixup=params["nmixup"],
-                   weights_choose_eps=params["weights_choose_eps"])
+                   weights_choose_eps=params["weights_choose_eps"],
+                   cnn=params['cnn'])
 
 
 def run_train():
@@ -83,6 +87,9 @@ def run_train():
         policy = CnnPolicy
     else:
         raise ValueError("unknown policy {}".format(train_params["policy"]))
+
+    if train_params['cnn'] == "openai1" and not env_params['small_size']:
+        warnings.warn('asked for openai1 policy, but dont set small size for env params')
 
     # create environments funcitons
     n_envs = train_params['n_envs']

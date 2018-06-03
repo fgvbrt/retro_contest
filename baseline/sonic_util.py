@@ -54,7 +54,7 @@ def make(game, state, discrete_actions=False, bk2dir=None):
 
 
 def make_remote_env(stack=2, scale_rew=True, color=False,  exp_type='obs', exp_const=0.002,
-                    socket_dir='/tmp'):
+                    socket_dir='/tmp', small_size=False):
     """
     Create an environment with some standard wrappers.
     """
@@ -66,7 +66,7 @@ def make_remote_env(stack=2, scale_rew=True, color=False,  exp_type='obs', exp_c
     if scale_rew:
         env = RewardScaler(env)
 
-    env = WarpFrame(env, color)
+    env = WarpFrame(env, color, small_size)
 
     if exp_const > 0:
         if exp_type == 'obs':
@@ -83,7 +83,7 @@ def make_remote_env(stack=2, scale_rew=True, color=False,  exp_type='obs', exp_c
 
 
 def make_rand_env(game_states, stack=2, scale_rew=True, color=False, exp_type='x',
-                  exp_const=0.002, max_episode_steps=4500, maml=False):
+                  exp_const=0.002, max_episode_steps=4500, maml=False, small_size=False):
     """
     Create an environment with some standard wrappers.
     """
@@ -106,7 +106,7 @@ def make_rand_env(game_states, stack=2, scale_rew=True, color=False, exp_type='x
     if scale_rew:
         env = RewardScaler(env)
 
-    env = WarpFrame(env, color)
+    env = WarpFrame(env, color, small_size)
 
     if exp_const > 0:
         if exp_type == 'obs':
@@ -420,11 +420,18 @@ class ObsExplorationReward(gym.Wrapper):
 
 
 class WarpFrame(gym.ObservationWrapper):
-    def __init__(self, env, color=False):
+    def __init__(self, env, color=False, small_size=False):
         """Warp frames to 84x84 as done in the Nature paper and later work."""
         gym.ObservationWrapper.__init__(self, env)
+        self.small_size = small_size
+
         self.width = 84
         self.height = 84
+
+        if small_size:
+            self.width = 42
+            self.height = 42
+
         self.color = color
         n_ch = 3 if color else 1
         self.observation_space = spaces.Box(
@@ -433,6 +440,11 @@ class WarpFrame(gym.ObservationWrapper):
     def observation(self, frame):
         if not self.color:
             frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
-        frame = cv2.resize(frame, (self.width, self.height), interpolation=cv2.INTER_AREA).\
-            reshape(self.height, self.width, -1)
+        frame = cv2.resize(frame, (84, 84), interpolation=cv2.INTER_AREA).\
+            reshape(84, 84, -1)
+
+        if self.small_size:
+            frame = cv2.resize(frame, (self.width, self.height), interpolation=cv2.INTER_AREA). \
+                reshape(self.width, self.height, -1)
+
         return frame

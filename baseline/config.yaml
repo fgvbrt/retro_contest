@@ -1,5 +1,6 @@
 train_params:
   policy: "cnn"
+  cnn: "openai1"
   max_steps: 200000000
   lr: 0.0002
   vf_coef: 0.5
@@ -17,7 +18,7 @@ train_params:
   save_interval: 10
   weights_path: null
   adam_stats: "weight_stats"
-  weights_choose_eps: 10
+  weights_choose_eps: 5
 
 env_params:
   exp_type: "x"
@@ -25,3 +26,4 @@ env_params:
   color: False
   stack: 4
   scale_rew: True
+  small_size: False

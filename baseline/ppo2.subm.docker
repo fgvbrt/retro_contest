@@ -9,10 +9,12 @@ RUN apt-get update && \
 # so we manually fetch the deps we need.
 RUN . ~/venv/bin/activate && \
     pip install scipy tqdm joblib zmq dill progressbar2 cloudpickle opencv-python pandas pyyaml && \
-    pip install --no-deps git+https://github.com/fgvbrt/baselines.git@16c0c5f75860a0a2261e953771c90238762e9778 && \
     pip install gym-retro && \
     git clone https://github.com/openai/retro-contest.git && cd retro-contest/support && \
     pip install .
+
+RUN . ~/venv/bin/activate && \
+    pip install --no-deps git+https://github.com/fgvbrt/baselines.git@bf47fe6b6237825fb20aa72551795bc3680be969
 
 ADD sonic_util.py ./
 ADD ppo2_agent.py ./

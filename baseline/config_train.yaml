@@ -1,3 +1,8 @@
+train_params:
+  cnn: "openai1"
+
 env_params:
   game_states: "all.csv"
   max_episode_steps: 4500
+  small_size: True
+  stack: 2
