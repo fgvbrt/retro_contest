@@ -13,6 +13,7 @@ import gym_remote.client as grc
 import retro_contest
 from baselines.common.atari_wrappers import FrameStack
 from copy import deepcopy
+
 cv2.ocl.setUseOpenCL(False)
 
 
@@ -82,6 +83,7 @@ def make_remote_env(stack=2, scale_rew=True, color=False,  exp_type=['obs'], exp
         env = FrameStack(env, stack)
 
     env = EpisodeInfo(env)
+    env = PositionState(env, np.asarray([1, 0.7, 0.5, 0.3]))
 
     return env
 
@@ -129,6 +131,8 @@ def make_rand_env(game_states, stack=2, scale_rew=True, color=False, exp_type=['
 
     if maml:
         env.sample = env_rand.sample
+
+    env = PositionState(env, np.asarray([1, 0.7, 0.5, 0.3]))
 
     return env
 
@@ -188,6 +192,46 @@ class BackupOriginalData(gym.Wrapper):
                 info['original']['obs'] = obs
 
         return obs, rew, done, info
+
+
+class PositionState(gym.Wrapper):
+    """
+    Backup all original information. Should be first wrapper
+    """
+    def __init__(self, env, alphas):
+        super(PositionState, self).__init__(env)
+        self._cur_x = 0
+        self._max_x = 0
+        self.alphas = alphas
+        self.vels = np.zeros(len(alphas))
+        self.observation_space = (env.observation_space,
+            spaces.Box(low=-1000, high=1000, shape=(2 + len(alphas), ), dtype=np.float32))
+
+    def reset(self, **kwargs):
+        self._cur_x = 0
+        self._max_x = 0
+        self.vels[:] = 0
+
+        state = self._get_position_state()
+
+        return self.env.reset(**kwargs), state
+
+    def _get_position_state(self):
+        return np.concatenate([[self._cur_x / 1000., self._max_x / 1000.], self.vels / 10.], axis=0).astype(np.float32)
+
+    def step(self, action):
+        obs, rew, done, info = self.env.step(action)
+
+        cur_x = self._cur_x + info['original']['rew']
+        vel_x = cur_x - self._cur_x
+
+        self._cur_x = cur_x
+        self.vels = self.vels * (1. - self.alphas) + self.alphas * vel_x
+        self._max_x = max(self._cur_x, self._max_x)
+
+        state = self._get_position_state()
+
+        return (obs, state), rew, done, info
 
 
 class AllowBacktracking(gym.Wrapper):
