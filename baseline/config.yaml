@@ -13,7 +13,7 @@ train_params:
   batch_size: 4500
   max_grad_norm: 0.5
   n_envs: 12
-  nmixup: 2
+  nmixup: 0
   log_interval: 5
   save_interval: 20
   weights_path: null
