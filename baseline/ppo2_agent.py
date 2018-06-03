@@ -60,7 +60,8 @@ def main(policy, env, params):
                    save_interval=params["save_interval"],
                    weights_path=params["weights_path"],
                    adam_stats=params["adam_stats"],
-                   nmixup=params["nmixup"])
+                   nmixup=params["nmixup"],
+                   weights_choose_eps=params["weights_choose_eps"])
 
 
 def run_train():

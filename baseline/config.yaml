@@ -17,10 +17,11 @@ train_params:
   save_interval: 10
   weights_path: null
   adam_stats: "weight_stats"
+  weights_choose_eps: 10
 
 env_params:
   exp_type: "x"
   exp_const: 0.005
   color: False
-  stack: 2
+  stack: 4
   scale_rew: True

@@ -1,5 +1,7 @@
 train_params:
-  weights_path: "weights.pkl"
+  n_envs: 1
+  nmixup: 0
+  weights_path: ["weights.pkl", "weights1.pkl", "weights2.pkl", "weights3.pkl"]
 
 env_params:
   socket_dir: "tmp/sock"
