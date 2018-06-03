@@ -1,5 +1,5 @@
 train_params:
-  cnn: "nature"
+  cnn: "openai2"
 
 env_params:
   game_states: "all.csv"
