@@ -1,0 +1,29 @@
+train_params:
+  policy: "cnn"
+  cnn: "openai1"
+  max_steps: 100000000
+  lr: 0.0002
+  vf_coef: 0.5
+  ent_coef: 0.01
+  cliprange: 0.1
+  gamma: 0.99
+  lam: 0.95
+  n_steps: 4500
+  n_opt_epochs: 3
+  batch_size: 4500
+  max_grad_norm: 0.5
+  n_envs: 12
+  nmixup: 2
+  log_interval: 5
+  save_interval: 20
+  weights_path: null
+  adam_stats: "weight_stats"
+  weights_choose_eps: 5
+
+env_params:
+  exp_type: ["x", "obs"]
+  exp_const: [0.005, 0.0001]
+  color: False
+  stack: 4
+  scale_rew: True
+  small_size: False

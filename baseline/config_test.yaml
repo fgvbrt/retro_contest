@@ -1,0 +1,14 @@
+train_params:
+  cnn: "nature"
+  weights_path: ["weights1.pkl", "weights2.pkl", "weights3.pkl", "weights4.pkl"]
+  n_envs: 1
+  nmixup: 0
+  save_interval: 0
+  log_interval: 1
+  weights_choose_eps: 5
+
+env_params:
+  stack: 2
+  exp_type: ["x", "obs"]
+  exp_const: [0.005, 0.001]
+  socket_dir: "tmp/sock"

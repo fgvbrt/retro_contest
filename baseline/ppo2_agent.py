@@ -9,16 +9,17 @@ import tensorflow as tf
 from baselines.common.vec_env.dummy_vec_env import DummyVecEnv
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
 import baselines.ppo2.ppo2 as ppo2
-import baselines.ppo2.policies as policies
 import gym_remote.exceptions as gre
 import functools
 import argparse
 import sonic_util
-import pandas as pd
-from time import sleep
 from baselines import logger
-from multiprocessing import cpu_count
 from baselines.ppo2.policies import LstmPolicy, CnnPolicy
+import utils
+import os
+import yaml
+import warnings
+from datetime import datetime
 
 
 def add_boolean_flag(parser, name, default=False, help=None):
@@ -39,7 +40,7 @@ def add_boolean_flag(parser, name, default=False, help=None):
     parser.add_argument("--no-" + name, action="store_false", dest=dest)
 
 
-def main(policy, clients_fn, total_timesteps=int(5e7), weights_path=None, adam_stats='all', save_interval=0):
+def main(policy, env, params):
     """Run PPO until the environment throws an exception."""
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True # pylint: disable=E1101
@@ -47,89 +48,68 @@ def main(policy, clients_fn, total_timesteps=int(5e7), weights_path=None, adam_s
         # Take more timesteps than we need to be sure that
         # we stop due to an exception.
         ppo2.learn(policy=policy,
-                   env=clients_fn,
-                   nsteps=2046 if policy == LstmPolicy else 4096,
-                   nminibatches=8,
-                   lam=0.95,
-                   gamma=0.99,
-                   noptepochs=3,
-                   log_interval=1,
-                   ent_coef=0.01,
-                   lr=lambda _: 2e-4,
-                   cliprange=lambda _: 0.1,
-                   total_timesteps=total_timesteps,
-                   save_interval=save_interval,
-                   weights_path=weights_path,
-                   adam_stats=adam_stats)
+                   env=env,
+                   nsteps=params['n_steps'],
+                   nminibatches=(params['n_steps']*env.num_envs) // params["batch_size"],
+                   lam=params["lam"],
+                   gamma=params['gamma'],
+                   noptepochs=params["n_opt_epochs"],
+                   log_interval=params["log_interval"],
+                   ent_coef=params["ent_coef"],
+                   vf_coef=params['vf_coef'],
+                   lr=lambda _: params["lr"],
+                   cliprange=lambda _: params['cliprange'],
+                   max_grad_norm=params['max_grad_norm'],
+                   total_timesteps=params["max_steps"],
+                   save_interval=params["save_interval"],
+                   weights_path=params["weights_path"],
+                   adam_stats=params["adam_stats"],
+                   nmixup=params["nmixup"],
+                   weights_choose_eps=params["weights_choose_eps"],
+                   cnn=params['cnn'])
 
 
 def run_train():
     def _parse_args():
         parser = argparse.ArgumentParser(description="Run commands")
-        parser.add_argument(
-            '--csv_file', type=str, default=None,
-            help="Csv file with train games. If None - connect to tmp/socket ")
-        parser.add_argument(
-            '--num_envs', type=int, default=int(1.5 * cpu_count()) - 1,
-            help="Number of parallele environments. Only if csv file is provided.")
-        parser.add_argument(
-            '--weights_path', type=str, default=None,
-            help="filename with weights")
-        parser.add_argument(
-            '--steps', type=int, default=int(10e7),
-            help="Number of steps in environment.")
-        parser.add_argument(
-            '--save_interval', type=int, default=0,
-            help="Periodicity of saving weights.")
-        parser.add_argument(
-            '--policy', type=str, default='cnn', choices=['lstm', 'cnn'],
-            help="Policy to use.")
-        parser.add_argument(
-            '--adam_stats', default='weight_stats', choices=['all', 'weight_stats', 'none'],
-            help="Adams params to restore.")
-        parser.add_argument(
-            '--exp_const', type=float, default=0.001,
-            help="Exploration constant.")
-        parser.add_argument(
-            '--exp_type', type=str, default='x', choices=['x', 'obs', 'none'],
-            help="Exploration type.")
-        add_boolean_flag(
-            parser, 'gray', True,
-            help="Convert image to grayscale.")
+        parser.add_argument('--config', type=str, default=None, nargs='+',
+                            help="file with config")
         return parser.parse_args()
 
     args = _parse_args()
+    config = utils.load_config(args.config)
 
-    if args.policy == 'lstm':
+    env_params = config['env_params']
+    train_params = config['train_params']
+
+    if train_params["policy"] == 'lstm':
         policy = LstmPolicy
-        stack = False
-    elif args.policy == 'cnn':
+    elif train_params["policy"] == 'cnn':
         policy = CnnPolicy
-        stack = True
     else:
-        raise ValueError()
+        raise ValueError("unknown policy {}".format(train_params["policy"]))
 
-    if args.csv_file is not None:
-        game_states = pd.read_csv(args.csv_file).values.tolist()
-        clients_fn = SubprocVecEnv([
-            functools.partial(
-                sonic_util.make_rand_env, game_states, stack,
-                gray=args.gray,
-                exp_type=args.exp_type,
-                exp_const=args.exp_const,)
-            for _ in range(args.num_envs)])
+    if train_params['cnn'] == "openai1" and not env_params['small_size']:
+        warnings.warn('asked for openai1 policy, but dont set small size for env params')
+
+    # create environments funcitons
+    n_envs = train_params['n_envs']
+    if n_envs == 1:
+        vec_fn = DummyVecEnv
+    elif n_envs > 1:
+        vec_fn = SubprocVecEnv
     else:
-        clients_fn = DummyVecEnv([functools.partial(
-            sonic_util.make_remote_env, stack,
-            gray=args.gray,
-            exp_const=args.exp_const,
-            exp_type=args.exp_type,
-            socket_dir="tmp/sock")
-        ])
+        raise ValueError('number of environments less than 1: {}'.format(n_envs))
+    env = vec_fn([functools.partial(sonic_util.make_from_config, env_params) for _ in range(n_envs)])
 
-    sleep(2)
-    logger.configure('logs')
-    main(policy, clients_fn, args.steps, args.weights_path, args.adam_stats, args.save_interval)
+    logdir = os.path.join("logs", str(datetime.now()))
+    logger.configure(logdir)
+
+    # save run config
+    with open(os.path.join(logdir, "run_config.yaml"), 'w') as f:
+        yaml.dump(config, f)
+
+    main(policy, env, train_params)
 
 
 if __name__ == '__main__':

@@ -1,0 +1,8 @@
+train_params:
+  cnn: "nature"
+
+env_params:
+  game_states: "all.csv"
+  max_episode_steps: 4500
+  small_size: False
+  stack: 2
