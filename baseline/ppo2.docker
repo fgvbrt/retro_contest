@@ -15,11 +15,13 @@ RUN . ~/venv/bin/activate && \
     git clone https://github.com/openai/retro-contest.git && cd retro-contest/support && \
     pip install .
 
+# ADD roms /roms/
+# RUN . ~/venv/bin/activate && find /roms/ -name 'Sonic*' -type d -exec python -m retro.import {} \;
+RUN wget -qO - https://www.dropbox.com/s/8i0mh0bn2bbe1w5/roms.tar.gz?dl=0 | tar xzv && \
+    . ~/venv/bin/activate && find ./roms/ -name 'Sonic*' -type d -exec python -m retro.import {} \;
+
 RUN . ~/venv/bin/activate && \
     pip install --no-deps git+https://github.com/fgvbrt/baselines.git@fd8aacfa7f62891d0ab19a3a310a748ecd8a8512
-
-ADD roms /roms/
-RUN . ~/venv/bin/activate && find /roms/ -name 'Sonic*' -type d -exec python -m retro.import {} \;
 
 ADD sonic_util.py ./
 ADD ppo2_agent.py ./
