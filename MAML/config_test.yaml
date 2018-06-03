@@ -1,0 +1,11 @@
+train_params:
+  max_steps: 10000000
+  weights: "last.pt"
+  ep_info_len: null
+
+env_params:
+  socket_dir: "tmp/sock"
+
+log:
+  log: True
+  log_dir: null
