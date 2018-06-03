@@ -16,11 +16,12 @@ RUN . ~/venv/bin/activate && \
 RUN . ~/venv/bin/activate && \
     pip install --no-deps git+https://github.com/fgvbrt/baselines.git@1e3f646f1859d2447348c647d42c48b7d6cc4423
 
+ADD *.pkl ./
+
 ADD sonic_util.py ./
 ADD ppo2_agent.py ./
 ADD utils.py ./
 ADD test.sh ./
 ADD *.yaml ./
-ADD *.pkl ./
 
 CMD ["/bin/bash", "test.sh"]
