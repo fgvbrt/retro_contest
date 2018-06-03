@@ -16,7 +16,7 @@ RUN . ~/venv/bin/activate && \
     pip install .
 
 RUN . ~/venv/bin/activate && \
-    pip install --no-deps git+https://github.com/fgvbrt/baselines.git@8d48c858eea1ab834dc8b2d407030f39daf00b23
+    pip install --no-deps git+https://github.com/fgvbrt/baselines.git@1e3f646f1859d2447348c647d42c48b7d6cc4423
 
 ADD roms /roms/
 RUN . ~/venv/bin/activate && find /roms/ -name 'Sonic*' -type d -exec python -m retro.import {} \;

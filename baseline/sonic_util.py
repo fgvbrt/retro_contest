@@ -53,7 +53,7 @@ def make(game, state, discrete_actions=False, bk2dir=None):
     return env
 
 
-def make_remote_env(stack=2, scale_rew=True, color=False,  exp_type='obs', exp_const=0.002,
+def make_remote_env(stack=2, scale_rew=True, color=False,  exp_type=['obs'], exp_const=[0.002],
                     socket_dir='/tmp', small_size=False):
     """
     Create an environment with some standard wrappers.
@@ -68,11 +68,15 @@ def make_remote_env(stack=2, scale_rew=True, color=False,  exp_type='obs', exp_c
 
     env = WarpFrame(env, color, small_size)
 
-    if exp_const > 0:
-        if exp_type == 'obs':
-            env = ObsExplorationReward(env, exp_const, game_specific=False)
-        elif exp_type == 'x':
-            env = XExplorationReward(env, exp_const, game_specific=False)
+    assert len(exp_type) == len(exp_const)
+    for t, c in zip(exp_type, exp_const):
+        if c > 0:
+            if t == 'obs':
+                env = ObsExplorationReward(env, c, game_specific=False)
+            elif t == 'x':
+                env = XExplorationReward(env, c, game_specific=False)
+            else:
+                raise ValueError('unknown exploration {}'.format(t))
 
     if stack > 1:
         env = FrameStack(env, stack)
@@ -82,8 +86,8 @@ def make_remote_env(stack=2, scale_rew=True, color=False,  exp_type='obs', exp_c
     return env
 
 
-def make_rand_env(game_states, stack=2, scale_rew=True, color=False, exp_type='x',
-                  exp_const=0.002, max_episode_steps=4500, maml=False, small_size=False):
+def make_rand_env(game_states, stack=2, scale_rew=True, color=False, exp_type=['x'],
+                  exp_const=[0.002], max_episode_steps=4500, maml=False, small_size=False):
     """
     Create an environment with some standard wrappers.
     """
@@ -108,11 +112,15 @@ def make_rand_env(game_states, stack=2, scale_rew=True, color=False, exp_type='x
 
     env = WarpFrame(env, color, small_size)
 
-    if exp_const > 0:
-        if exp_type == 'obs':
-            env = ObsExplorationReward(env, exp_const, game_specific=True)
-        elif exp_type == 'x':
-            env = XExplorationReward(env, exp_const, game_specific=True)
+    assert len(exp_type) == len(exp_const)
+    for t, c in zip(exp_type, exp_const):
+        if c > 0:
+            if t == 'obs':
+                env = ObsExplorationReward(env, c, game_specific=True)
+            elif t == 'x':
+                env = XExplorationReward(env, c, game_specific=True)
+            else:
+                raise ValueError('unknown exploration {}'.format(t))
 
     if stack > 1:
         env = FrameStack(env, stack)
@@ -323,16 +331,16 @@ class XExplorationReward(gym.Wrapper):
 
             r_plus = self.exp_const / np.sqrt(cnt + 0.01)
 
-        info['rew_exp'] = r_plus
+        info['rew_exp_x'] = r_plus
         self._exp_reward += r_plus
         self._ep_rew_total += rew
         rew += r_plus
 
         if done:
             if "episode" not in info:
-                info["episode"] = {"r": self._ep_rew_total, "r_exp": self._exp_reward}
+                info["episode"] = {"r": self._ep_rew_total, "r_exp_x": self._exp_reward}
             elif isinstance(info["episode"], dict):
-                info["episode"]["r_exp"] = self._exp_reward
+                info["episode"]["r_exp_x"] = self._exp_reward
                 if "r" not in info["episode"]:
                     info["episode"]["r"] = self._ep_rew_total
             self._ep_rew_total = 0
@@ -396,16 +404,16 @@ class ObsExplorationReward(gym.Wrapper):
                 pseudo_cnt = p * (1 - p_after) / (p_after - p)
             r_plus = self.exp_const / np.sqrt(pseudo_cnt + 0.01)
 
-        info['rew_exp'] = r_plus
+        info['rew_exp_obs'] = r_plus
         self._exp_reward += r_plus
         self._ep_rew_total += rew
         rew += r_plus
 
         if done:
             if "episode" not in info:
-                info["episode"] = {"r": self._ep_rew_total, "r_exp": self._exp_reward}
+                info["episode"] = {"r": self._ep_rew_total, "r_exp_obs": self._exp_reward}
             elif isinstance(info["episode"], dict):
-                info["episode"]["r_exp"] = self._exp_reward
+                info["episode"]["r_exp_obs"] = self._exp_reward
                 if "r" not in info["episode"]:
                     info["episode"]["r"] = self._ep_rew_total
             self._ep_rew_total = 0
