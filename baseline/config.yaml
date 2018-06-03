@@ -12,8 +12,8 @@ train_params:
   n_opt_epochs: 3
   batch_size: 4500
   max_grad_norm: 0.5
-  n_envs: 8
-  nmixup: 3
+  n_envs: 12
+  nmixup: 2
   log_interval: 5
   save_interval: 20
   weights_path: null
