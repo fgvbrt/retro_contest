@@ -19,6 +19,7 @@ import utils
 import os
 import yaml
 import warnings
+from datetime import datetime
 
 
 def add_boolean_flag(parser, name, default=False, help=None):
@@ -101,10 +102,11 @@ def run_train():
         raise ValueError('number of environments less than 1: {}'.format(n_envs))
     env = vec_fn([functools.partial(sonic_util.make_from_config, env_params) for _ in range(n_envs)])
 
-    logger.configure('logs')
+    logdir = os.path.join("logs", str(datetime.now()))
+    logger.configure(logdir)
 
     # save run config
-    with open(os.path.join("logs", "run_config.yaml"), 'w') as f:
+    with open(os.path.join(logdir, "run_config.yaml"), 'w') as f:
         yaml.dump(config, f)
 
     main(policy, env, train_params)

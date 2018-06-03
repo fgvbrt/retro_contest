@@ -14,8 +14,8 @@ train_params:
   max_grad_norm: 0.5
   n_envs: 8
   nmixup: 3
-  log_interval: 1
-  save_interval: 10
+  log_interval: 5
+  save_interval: 20
   weights_path: null
   adam_stats: "weight_stats"
   weights_choose_eps: 5
