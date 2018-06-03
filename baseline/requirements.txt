@@ -1,0 +1,11 @@
+scipy
+tqdm
+joblib
+zmq
+dill
+progressbar2
+cloudpickle
+opencv-python
+pandas
+gym-retro
+pyyaml
