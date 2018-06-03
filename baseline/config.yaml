@@ -1,6 +1,6 @@
 train_params:
   policy: "cnn"
-  max_steps: 100000000
+  max_steps: 200000000
   lr: 0.0002
   vf_coef: 0.5
   ent_coef: 0.01
