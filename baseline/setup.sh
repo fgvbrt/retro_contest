@@ -3,7 +3,7 @@ conda create -n retro python=3.5 -y
 source activate retro
 pip install http://download.pytorch.org/whl/cu91/torch-0.4.0-cp35-cp35m-linux_x86_64.whl
 pip install -r requirements.txt
-pip install --no-deps git+https://github.com/fgvbrt/baselines.git@1e3f646f1859d2447348c647d42c48b7d6cc4423
+pip install --no-deps git+https://github.com/fgvbrt/baselines.git@fceb032d4310b731122cf0a29ea977d5c5199739
 git clone https://github.com/openai/retro-contest.git && cd retro-contest/support && pip install .
 
 # download roms

@@ -14,7 +14,7 @@ RUN . ~/venv/bin/activate && \
     pip install .
 
 RUN . ~/venv/bin/activate && \
-    pip install --no-deps git+https://github.com/fgvbrt/baselines.git@1e3f646f1859d2447348c647d42c48b7d6cc4423
+    pip install --no-deps git+https://github.com/fgvbrt/baselines.git@fceb032d4310b731122cf0a29ea977d5c5199739
 
 ADD sonic_util.py ./
 ADD ppo2_agent.py ./
