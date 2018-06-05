@@ -1,6 +1,6 @@
 train_params:
   cnn: "nature"
-  weights_path: ["weights1.pkl", "weights2.pkl", "weights3.pkl", "weights4.pkl"]
+  weights_path: ["w1.pkl", "w2.pkl", "w3.pkl", "w4.pkl", "w5.pkl", "w6.pkl"]
   n_envs: 1
   nmixup: 0
   save_interval: 0
@@ -8,7 +8,7 @@ train_params:
   weights_choose_eps: 5
 
 env_params:
-  stack: 2
+  stack: 4
   exp_type: ["x", "obs"]
-  exp_const: [0.005, 0.001]
+  exp_const: [0.0, 0.000]
   socket_dir: "tmp/sock"

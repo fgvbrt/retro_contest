@@ -21,7 +21,7 @@ RUN wget -qO - https://www.dropbox.com/s/8i0mh0bn2bbe1w5/roms.tar.gz?dl=0 | tar 
     . ~/venv/bin/activate && find ./roms/ -name 'Sonic*' -type d -exec python -m retro.import {} \;
 
 RUN . ~/venv/bin/activate && \
-    pip install --no-deps git+https://github.com/fgvbrt/baselines.git@1e3f646f1859d2447348c647d42c48b7d6cc4423
+    pip install --no-deps git+https://github.com/fgvbrt/baselines.git@fbbd70a62e606ac8c9c92162f5bcf843dfd983ca
 
 ADD sonic_util.py ./
 ADD ppo2_agent.py ./

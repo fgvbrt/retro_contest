@@ -1,8 +1,13 @@
 train_params:
   cnn: "nature"
+  n_steps: 5
+  batch_size: 5
+  weights_path: ["w1.pkl", "w2.pkl"]
+  n_envs: 1
+  nmixup: 0
 
 env_params:
-  game_states: "all.csv"
+  game_states: "train_debug.csv"
   max_episode_steps: 4500
   small_size: False
-  stack: 2
+  stack: 4

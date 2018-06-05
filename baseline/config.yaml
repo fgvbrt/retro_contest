@@ -22,7 +22,7 @@ train_params:
 
 env_params:
   exp_type: ["x", "obs"]
-  exp_const: [0.005, 0.0001]
+  exp_const: [0.01, 0.0005]
   color: False
   stack: 4
   scale_rew: True
