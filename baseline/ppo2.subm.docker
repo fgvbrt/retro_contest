@@ -14,7 +14,7 @@ RUN . ~/venv/bin/activate && \
     pip install .
 
 RUN . ~/venv/bin/activate && \
-    pip install --no-deps git+https://github.com/fgvbrt/baselines.git@fbbd70a62e606ac8c9c92162f5bcf843dfd983ca
+    pip install --no-deps git+https://github.com/fgvbrt/baselines.git@83434d3b05ea5efff54c485b94ceb4e8b276b6f8
 
 ADD *.pkl ./
 
