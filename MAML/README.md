@@ -1,3 +1,8 @@
+# Algorithms
+
+Attempt to implement [MAML](https://arxiv.org/abs/1703.03400) and [REPTILE](https://arxiv.org/abs/1803.02999)
+meta learning algorithms. 
+
 # Setup
 
 Setup environment with script setup.sh (you need conda for it otherwise change it)
